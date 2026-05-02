@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 150 16% 96%;
+    --foreground: 176 60% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 176 60% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 176 60% 15%;
+
+    --primary: 176 60% 15%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 156 14% 94%;
+    --secondary-foreground: 176 60% 15%;
+
+    --muted: 156 14% 94%;
+    --muted-foreground: 170 10% 45%;
+
+    --accent: 83 78% 53%;
+    --accent-foreground: 176 60% 15%;
+
+    --destructive: 0 69% 67%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 156 14% 88%;
+    --input: 156 14% 88%;
+    --ring: 83 78% 53%;
+
+    --radius: 1rem;
+
+    /* Custom tokens */
+    --risk-low: 101 61% 60%;
+    --risk-moderate: 39 89% 60%;
+    --risk-high: 0 69% 67%;
+
+    --shadow-card: 0 2px 12px -2px hsl(176 60% 15% / 0.06);
+    --shadow-elevated: 0 8px 24px -4px hsl(176 60% 15% / 0.1);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+}

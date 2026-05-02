@@ -1,0 +1,15 @@
+{
+  "name": "Food Scanner",
+  "short_name": "FoodScanner",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f1f5f1",
+  "theme_color": "#113d38",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48 32x32 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
