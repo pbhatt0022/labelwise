@@ -10,11 +10,11 @@ It is intentionally **not** a barcode scanner, calorie tracker, dieting app, or 
 
 **Demo Video** — overview, research framing, and live feature walkthrough with voiceover
 
-[![Watch the LabelWise Demo](https://img.youtube.com/vi/Y_wO1iJ5YHY/maxresdefault.jpg)](https://youtu.be/Y_wO1iJ5YHY)
+[![Watch the LabelWise Demo](https://img.youtube.com/vi/Y_wO1iJ5YHY/hqdefault.jpg)](https://youtu.be/Y_wO1iJ5YHY)
 
 **App Tutorial** — full screen recording walkthrough of every feature and screen
 
-[![Watch the LabelWise App Tutorial](https://img.youtube.com/vi/SWw5AXbbv6o/maxresdefault.jpg)](https://youtu.be/SWw5AXbbv6o)
+[![Watch the LabelWise App Tutorial](https://img.youtube.com/vi/SWw5AXbbv6o/hqdefault.jpg)](https://youtu.be/SWw5AXbbv6o)
 
 ---
 
