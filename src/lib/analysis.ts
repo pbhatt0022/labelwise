@@ -40,11 +40,18 @@ const concernIdMap = {
     Vegetarian: "vegetarian",
     "Low Sodium": "low_sodium_watch",
     Keto: "keto_watch",
+    "Gluten-free": "gluten_free",
+    "Dairy-free": "dairy_free",
+    "Nut-free": "nut_free",
   },
   sensitivities: {
     MSG: "avoid_msg",
     "Artificial Sweeteners": "avoid_artificial_sweeteners",
     Preservatives: "avoid_preservatives",
+    Coloring: "avoid_coloring",
+    Emulsifiers: "avoid_emulsifiers",
+    "Industrial Fats": "avoid_industrial_fats",
+    "Refined Fillers": "avoid_refined_fillers",
   },
 } as const;
 
@@ -65,9 +72,9 @@ function getPlainLanguageMeaning(resolved: ResolvedIngredientMatch): string {
 function getLiteracyTip(resolved: ResolvedIngredientMatch): string {
   if (resolved.matchedAlias.toLowerCase().includes("ins")) return "INS codes often hide additive names, so translating them can make the label much easier to understand.";
   if (resolved.matchStrength === "cautionary") return "Broad terms like this can hide the exact source, so they are worth double-checking before you rely on them.";
-  if (resolved.category === "Sweetener") return 'Front-of-pack claims like "sugar-free" can still sit alongside sweeteners or fast-digesting fillers in the ingredient list.';
+  if (resolved.category === "Sweetener") return 'Names like "sugar-free" or "no added sugar" can still sit alongside sweeteners or fast-digesting fillers in the ingredient list.';
   if (resolved.category === "Fat") return 'Generic names like "vegetable oil" do not always tell you which fat is actually being used.';
-  return "The ingredient list often gives a clearer health picture than the front-of-pack message or branding.";
+  return "The ingredient list often gives a clearer picture than the branding on the package.";
 }
 
 function getBehaviorGoal(rule: ConcernRule, concern: ConcernDefinition): BehaviorGoal {
@@ -78,10 +85,10 @@ function getBehaviorGoal(rule: ConcernRule, concern: ConcernDefinition): Behavio
 }
 
 function getNudgeMessage(goal: BehaviorGoal): string {
-  if (goal === "avoid") return "If this is a firm no for you, save a better option so the next shopping decision takes less effort.";
+  if (goal === "avoid") return "If this is a firm no for you, save an alternative so the next shopping decision takes less effort.";
   if (goal === "double_check") return "This is a good moment to pause and compare this product with a simpler alternative before buying.";
   if (goal === "compare_alternatives") return "Try comparing this label with another version that has fewer or clearer ingredients.";
-  return "If this works for your preferences, save it to a folder like Safe Foods so you can find it quickly later.";
+  return "If this works for your preferences, save it to a folder like Go-To Options so you can find it quickly later.";
 }
 
 function createProfileReason(definition: ConcernDefinition): string {
@@ -332,7 +339,15 @@ export function getDefaultProfile(): UserProfile {
     sensitivities: [],
     selectedConcernIds: [],
     customAvoids: [],
+    dailySugarPreferenceG: undefined,
+    dailySodiumPreferenceMg: undefined,
+    dailySaturatedFatPreferenceG: undefined,
   };
+}
+
+function normalizePreferenceValue(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  return Number.isInteger(value) ? value : Math.round(value * 10) / 10;
 }
 
 export function normalizeProfile(profile: UserProfile): UserProfile {
@@ -343,11 +358,22 @@ export function normalizeProfile(profile: UserProfile): UserProfile {
     sensitivities: profile.sensitivities ?? [],
     selectedConcernIds: Array.from(new Set(profile.selectedConcernIds ?? getConcernIdsFromProfile(profile))),
     customAvoids: profile.customAvoids ?? [],
+    dailySugarPreferenceG: normalizePreferenceValue(profile.dailySugarPreferenceG),
+    dailySodiumPreferenceMg: normalizePreferenceValue(profile.dailySodiumPreferenceMg),
+    dailySaturatedFatPreferenceG: normalizePreferenceValue(profile.dailySaturatedFatPreferenceG),
   };
 }
 
 export function hasProfileSelections(profile: UserProfile): boolean {
-  return getConcernIdsFromProfile(profile).length > 0 || profile.customAvoids.length > 0;
+  return (
+    profile.allergies.length > 0 ||
+    profile.diet.length > 0 ||
+    profile.sensitivities.length > 0 ||
+    profile.customAvoids.length > 0 ||
+    typeof profile.dailySugarPreferenceG === "number" ||
+    typeof profile.dailySodiumPreferenceMg === "number" ||
+    typeof profile.dailySaturatedFatPreferenceG === "number"
+  );
 }
 
 export function getConcernIdsForLegacySelections(values: {

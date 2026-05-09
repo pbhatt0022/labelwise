@@ -1,9 +1,8 @@
 import { useNavigate } from "react-router-dom";
-import BottomNav from "@/components/BottomNav";
 import ProfileSummary from "@/components/ProfileSummary";
 import { useAppState } from "@/context/AppStateContext";
 import { hasProfileSelections } from "@/lib/analysis";
-import { ArrowRight, Bookmark, BrainCircuit, Leaf, ScanLine } from "lucide-react";
+import { ArrowRight, Bookmark, Leaf, ScanLine } from "lucide-react";
 
 const HomeScreen = () => {
   const navigate = useNavigate();
@@ -14,108 +13,91 @@ const HomeScreen = () => {
 
   return (
     <div className="min-h-screen bg-background pb-[80px]">
-      <div className="bg-primary px-[24px] pb-[32px] pt-[48px] rounded-b-2xl">
-        <div className="mb-[4px] flex items-center gap-[8px]">
-          <Leaf size={20} className="text-accent" />
-          <span className="text-sm font-semibold text-primary-foreground/70">Food Scanner</span>
+      <div className="bg-primary px-[24px] pb-[48px] pt-[56px] rounded-b-3xl">
+        <div className="mb-[20px] flex items-center gap-[8px]">
+          <Leaf size={16} className="text-accent" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-foreground/50">LabelWise</span>
         </div>
-        <h1 className="text-[24px] font-bold text-primary-foreground">Hi {currentUser?.displayName || "there"}, scan with confidence</h1>
-        <p className="mt-[4px] text-sm text-primary-foreground/60">
-          A health psychology-led label literacy tool that reduces confusion, explains hidden ingredients, and helps you save better decisions for later.
+        <h1 className="text-[30px] font-bold leading-tight text-primary-foreground">
+          {currentUser?.displayName ? `Hi ${currentUser.displayName}.` : "Know what's"}<br />
+          {currentUser?.displayName ? "Know what's in your food." : "in your food."}
+        </h1>
+        <p className="mt-[10px] text-sm leading-relaxed text-primary-foreground/55">
+            Scan any label to understand ingredients, nutrition, and diet compatibility — matched to your profile.
         </p>
       </div>
 
-      <div className="px-[24px] -mt-[24px] space-y-[16px]">
+      <div className="px-[24px] -mt-[28px] space-y-[12px]">
         <button
           onClick={() => navigate("/scan")}
-          className="w-full rounded-2xl bg-card p-[24px] shadow-elevated flex items-center gap-[16px] transition-all duration-200 hover:shadow-card active:scale-[0.98]"
+          className="w-full rounded-2xl bg-accent p-[20px] shadow-elevated flex items-center gap-[16px] transition-all duration-200 active:scale-[0.98]"
         >
-          <div className="w-[56px] h-[56px] rounded-xl bg-accent/15 flex items-center justify-center">
-            <ScanLine size={28} className="text-accent" />
+          <div className="w-[48px] h-[48px] rounded-xl bg-accent-foreground/10 flex items-center justify-center shrink-0">
+            <ScanLine size={24} className="text-accent-foreground" />
           </div>
-          <div className="text-left">
-            <p className="text-base font-semibold text-foreground">Scan Food Label</p>
-            <p className="text-sm text-muted-foreground">Use your camera, photo gallery, or manual ingredient paste</p>
+          <div className="text-left flex-1 min-w-0">
+            <p className="text-base font-bold text-accent-foreground">Scan a label</p>
+            <p className="text-sm text-accent-foreground/65">Camera, photo, or manual entry</p>
           </div>
+          <ArrowRight size={20} className="text-accent-foreground/50 shrink-0" />
         </button>
 
-        <div className="grid gap-[12px] sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-[12px]">
           <div className="rounded-2xl bg-card p-[18px] shadow-card">
-            <div className="mb-[10px] inline-flex items-center gap-[8px] text-sm font-semibold text-foreground">
-              <Bookmark size={16} className="text-accent" /> Favorites
+            <div className="mb-[6px] flex items-center gap-[6px]">
+              <ScanLine size={13} className="text-muted-foreground" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Scans</p>
             </div>
-            <p className="text-2xl font-bold text-foreground">{favoriteCount}</p>
-            <p className="text-sm text-muted-foreground">Products you marked as useful, safe, or worth revisiting.</p>
+            <p className="text-[32px] font-bold leading-none text-foreground">{history.length}</p>
           </div>
           <div className="rounded-2xl bg-card p-[18px] shadow-card">
-            <div className="mb-[10px] inline-flex items-center gap-[8px] text-sm font-semibold text-foreground">
-              <ScanLine size={16} className="text-accent" /> Saved scans
+            <div className="mb-[6px] flex items-center gap-[6px]">
+              <Bookmark size={13} className="text-muted-foreground" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Favorites</p>
             </div>
-            <p className="text-2xl font-bold text-foreground">{history.length}</p>
-            <p className="text-sm text-muted-foreground">Your past label checks stay linked to this account for later reference.</p>
+            <p className="text-[32px] font-bold leading-none text-foreground">{favoriteCount}</p>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-card p-[20px] shadow-card">
-          <div className="mb-[12px] flex items-center justify-between gap-[12px]">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">Your active profile</h2>
-              <p className="text-sm text-muted-foreground">
-                {profileReady ? "These choices control the ingredient flags." : "Set preferences to personalize your results."}
-              </p>
-            </div>
-            <button
-              onClick={() => navigate("/profile-setup")}
-              className="inline-flex items-center gap-[6px] text-sm font-medium text-accent"
-            >
-              {profileReady ? "Edit" : "Set up"} <ArrowRight size={16} />
-            </button>
-          </div>
-          <ProfileSummary profile={profile} compact />
-        </div>
-
-        <div className="rounded-2xl bg-card p-[20px] shadow-card">
-          <div className="mb-[8px] inline-flex items-center gap-[8px] text-sm font-semibold text-foreground">
-            <BrainCircuit size={16} className="text-accent" /> Why this helps
-          </div>
-          <p className="text-sm text-muted-foreground">
-            This app is designed to reduce cognitive load, make ingredient information personally relevant, and nudge healthier packaged-food choices without relying on technical label knowledge.
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-card p-[20px] shadow-card">
-          <div className="mb-[12px] flex items-center justify-between gap-[12px]">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">Library</h2>
-              <p className="text-sm text-muted-foreground">Open your saved scans, folders, and favorites in one place.</p>
-            </div>
-            <button onClick={() => navigate("/history")} className="text-sm font-medium text-accent">
-              Open
-            </button>
-          </div>
-
-          {latestScan ? (
-            <button
-              onClick={() => {
-                selectScan(latestScan.id);
-                navigate("/results");
-              }}
-              className="w-full rounded-xl bg-secondary/35 p-[14px] text-left transition-all duration-200 hover:bg-secondary/50"
-            >
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Latest scan</p>
-              <p className="mt-[6px] text-sm font-semibold text-foreground">{latestScan.productName}</p>
+        {latestScan && (
+          <button
+            onClick={() => {
+              selectScan(latestScan.id);
+              navigate("/results");
+            }}
+            className="w-full rounded-2xl bg-card p-[18px] shadow-card text-left flex items-center gap-[14px] transition-all duration-200 active:scale-[0.98]"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Last scan</p>
+              <p className="mt-[4px] text-sm font-semibold text-foreground truncate">{latestScan.productName}</p>
               <p className="text-xs text-muted-foreground">
-                {latestScan.brandName ? `${latestScan.brandName} | ` : ""}
+                {latestScan.brandName ? `${latestScan.brandName} · ` : ""}
                 {new Date(latestScan.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </p>
+            </div>
+            <ArrowRight size={16} className="text-muted-foreground shrink-0" />
+          </button>
+        )}
+
+        <div className="rounded-2xl bg-card p-[18px] shadow-card">
+          <div className="mb-[14px] flex items-center justify-between gap-[12px]">
+            <p className="text-sm font-semibold text-foreground">Your profile</p>
+            <button
+              onClick={() => navigate("/profile-setup")}
+              className="inline-flex items-center gap-[4px] text-sm font-medium text-primary"
+            >
+              {profileReady ? "Edit" : "Set up"} <ArrowRight size={14} />
             </button>
-          ) : (
-            <p className="text-sm text-muted-foreground">No scans yet. Your saved items and folders will appear in the library after your first scan.</p>
+          </div>
+          {!profileReady && (
+            <p className="mb-[12px] text-xs text-muted-foreground">
+              Add your allergies, diet preferences, sensitivities, or custom avoids so results are matched to you.
+            </p>
           )}
+          <ProfileSummary profile={profile} compact />
         </div>
       </div>
 
-      <BottomNav />
     </div>
   );
 };

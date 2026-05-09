@@ -8,11 +8,22 @@ export type FlagSource = "built_in_concern" | "custom_avoid";
 export type OcrStatus = "idle" | "extracting" | "success" | "error";
 export type BehaviorGoal = "avoid" | "double_check" | "compare_alternatives" | "save_safe";
 export type ReflectionChoice = "yes" | "maybe" | "no";
+export type NutritionFindingTone = "matched_preference" | "worth_reviewing" | "good_to_know";
+export type DietCrossCheckTone = "good_to_know" | "worth_reviewing";
+export type DietCompatibilityStatus = "compatible" | "not_compatible" | "needs_review" | "unknown";
 
 export type AllergyOption = "Milk" | "Gluten" | "Nuts" | "Soy" | "Eggs" | "Shellfish";
 export type HealthOption = "Diabetes" | "High BP" | "Cholesterol";
-export type DietOption = "Vegan" | "Vegetarian" | "Low Sodium" | "Keto";
-export type SensitivityOption = "MSG" | "Artificial Sweeteners" | "Preservatives";
+export type DietOption = "Vegan" | "Vegetarian" | "Low Sodium" | "Keto" | "Gluten-free" | "Dairy-free" | "Nut-free";
+export type SensitivityOption =
+  | "MSG"
+  | "Artificial Sweeteners"
+  | "Preservatives"
+  | "Coloring"
+  | "Emulsifiers"
+  | "Industrial Fats"
+  | "Refined Fillers";
+export type DietCompatibilityPreference = Extract<DietOption, "Vegan" | "Vegetarian" | "Keto" | "Gluten-free" | "Dairy-free" | "Nut-free">;
 
 export interface UserCustomAvoid {
   id: string;
@@ -30,6 +41,9 @@ export interface UserProfile {
   sensitivities: SensitivityOption[];
   selectedConcernIds: string[];
   customAvoids: UserCustomAvoid[];
+  dailySugarPreferenceG?: number;
+  dailySodiumPreferenceMg?: number;
+  dailySaturatedFatPreferenceG?: number;
 }
 
 export interface UserAccount {
@@ -144,12 +158,79 @@ export interface AnalysisResult {
   flags: MatchedFlag[];
   overallRisk: RiskLevel;
   matchedConcernTags: string[];
+  nutritionFacts?: NutritionFacts;
+  nutritionFindings?: NutritionFinding[];
+  dietCrossChecks?: DietCrossCheck[];
+  dietCompatibility?: DietCompatibilityResult[];
+  explanation?: StructuredExplanation;
+}
+
+export interface NutritionFacts {
+  servingSize?: string;
+  caloriesPerServing?: number;
+  sugarG?: number;
+  addedSugarG?: number;
+  proteinG?: number;
+  totalFatG?: number;
+  saturatedFatG?: number;
+  sodiumMg?: number;
+  fiberG?: number;
+  carbohydratesG?: number;
+}
+
+export interface NutritionFinding {
+  id: string;
+  nutrientKey: keyof Omit<NutritionFacts, "servingSize">;
+  label: string;
+  tone: NutritionFindingTone;
+  value: number;
+  unit: string;
+  preferenceValue?: number;
+  summary: string;
+  detail: string;
+}
+
+export interface DietCrossCheck {
+  diet: DietOption;
+  tone: DietCrossCheckTone;
+  headline: string;
+  summary: string;
+  evidence: string[];
+  provider?: "gemini";
+}
+
+export interface DietCompatibilityMatch {
+  preference: DietCompatibilityPreference | "Custom avoids";
+  status: Exclude<DietCompatibilityStatus, "compatible" | "unknown">;
+  canonicalIngredientName: string;
+  matchedTerm: string;
+  reason: string;
+  sourceCategory: string;
+  sourceType: "curated_rule" | "custom_avoid";
+}
+
+export interface DietCompatibilityResult {
+  preference: DietCompatibilityPreference | "Custom avoids";
+  status: DietCompatibilityStatus;
+  matchedConcerns: DietCompatibilityMatch[];
+  reviewItems: DietCompatibilityMatch[];
+  summary: string;
+}
+
+export interface StructuredExplanation {
+  mode: "template" | "llm";
+  provider?: "gemini";
+  headline: string;
+  summary: string;
+  bullets: string[];
 }
 
 export interface ScanDraft {
   productName: string;
   brandName: string;
   ingredientText: string;
+  includeNutritionDetails?: boolean;
+  nutritionFacts?: NutritionFacts;
   imageName?: string;
   imagePreviewUrl?: string;
   ocrStatus?: OcrStatus;
@@ -157,6 +238,13 @@ export interface ScanDraft {
   ocrConfidence?: number;
   ocrError?: string;
   ocrSourceImageName?: string;
+  nutritionImageName?: string;
+  nutritionImagePreviewUrl?: string;
+  nutritionOcrStatus?: OcrStatus;
+  nutritionOcrText?: string;
+  nutritionOcrConfidence?: number;
+  nutritionOcrError?: string;
+  nutritionOcrSourceImageName?: string;
 }
 
 export interface ScanRecord {
@@ -165,6 +253,7 @@ export interface ScanRecord {
   productName: string;
   brandName?: string;
   ingredientText: string;
+  nutritionFacts?: NutritionFacts;
   imageName?: string;
   createdAt: string;
   ocrText?: string;

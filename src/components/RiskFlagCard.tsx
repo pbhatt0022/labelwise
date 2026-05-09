@@ -63,9 +63,8 @@ const RiskFlagCard = ({
       <p className="text-sm text-muted-foreground leading-relaxed">{explanation}</p>
       {primarySupportText && <p className="mt-[8px] text-xs text-muted-foreground">{primarySupportText}</p>}
 
-      <div className="mt-[10px] flex flex-wrap gap-[8px]">
+      <div className="mt-[10px]">
         <span className="rounded-full bg-primary/10 px-[10px] py-[5px] text-[11px] font-medium text-primary">{compactSourceLabel}</span>
-        <span className="rounded-full bg-secondary px-[10px] py-[5px] text-[11px] font-medium text-muted-foreground">Source: {sourceLabel}</span>
       </div>
 
       {(cautionary || cautionMessage) && (
@@ -76,7 +75,7 @@ const RiskFlagCard = ({
 
       {shouldShowLiteracyTip && <p className="mt-[8px] text-xs text-muted-foreground">Label tip: {literacyTip}</p>}
 
-      {(suggestion || nudgeMessage) && <p className="text-xs text-muted-foreground mt-[8px] pt-[8px] border-t border-border italic">Suggested action: {suggestion ?? nudgeMessage}</p>}
+      {(suggestion || nudgeMessage) && <p className="text-xs text-muted-foreground mt-[8px] pt-[8px] border-t border-border italic">Next step: {suggestion ?? nudgeMessage}</p>}
     </div>
   );
 };

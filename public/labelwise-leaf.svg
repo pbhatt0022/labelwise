@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">LabelWise leaf icon</title>
+  <desc id="desc">A bright green leaf icon on a dark teal rounded square.</desc>
+  <rect width="64" height="64" rx="16" fill="#113d38" />
+  <g transform="translate(8 8)" fill="none" stroke="#b7f432" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.75">
+    <path d="M28.6 39A18.5 18.5 0 0 1 25.4 2.8C40.6-.1 44.6-1.5 49.9-8c2.7 5.2 5.2 10.9 5.2 20.9C55.1 27.2 42.5 39 28.6 39Z" transform="scale(0.78) translate(3.2 10.5)"/>
+    <path d="M7.2 45.8c0-7.7 4.8-13.7 13.1-16.2 6.2-1.8 12.6-5.7 15.2-8.2" transform="scale(0.78) translate(3.2 10.5)"/>
+  </g>
+</svg>

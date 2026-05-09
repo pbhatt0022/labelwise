@@ -7,16 +7,16 @@ import { Leaf, ArrowRight, BrainCircuit, ScanSearch } from "lucide-react";
 
 const slides = [
   {
-    title: "Understand what is really in your food.",
-    description: "Scan packaged labels and turn technical ingredients into clear, personalized explanations at the moment you are deciding.",
+    title: "Understand what the full label is really saying.",
+    description: "Scan packaged labels and turn technical ingredients into clearer, more personal explanations at the moment you are deciding.",
   },
   {
     title: "Built on health psychology, not just OCR.",
-    description: "Food Scanner reduces label-reading effort, supports reflective choices, and nudges healthier decisions without overwhelming you.",
+    description: "LabelWise reduces label-reading effort, supports reflective choices, and keeps the focus on food-label literacy rather than calorie tracking or dieting.",
   },
   {
     title: "Save what works for you.",
-    description: "Create an account, keep your profile, favorite safe foods, and organize scans into folders for grocery planning or later review.",
+    description: "Create an account, keep your profile, and organize useful label checks into folders for grocery planning or later review.",
   },
 ];
 
@@ -43,6 +43,9 @@ const Onboarding = () => {
             {slides[step].title}
           </h1>
           <p className="text-base text-primary-foreground/70 leading-relaxed">{slides[step].description}</p>
+          <p className="mt-[12px] text-xs text-primary-foreground/60">
+            Educational guidance only. LabelWise does not diagnose, prescribe diets, or give medical advice.
+          </p>
         </div>
 
         <div className="flex justify-center gap-[8px] mb-[32px]">

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type PropsWith
 
 import { getDefaultProfile, normalizeProfile } from "@/lib/analysis";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import type { ReflectionChoice, ReflectionEntry, ScanDraft, ScanFolder, ScanRecord, UserAccount, UserProfile } from "@/lib/types";
+import type { DietCrossCheck, ReflectionChoice, ReflectionEntry, ScanDraft, ScanFolder, ScanRecord, StructuredExplanation, UserAccount, UserProfile } from "@/lib/types";
 
 const ACCOUNTS_STORAGE_KEY = "food-scanner-accounts";
 const PROFILES_STORAGE_KEY = "food-scanner-profiles";
@@ -14,6 +14,7 @@ const SESSION_STORAGE_KEY = "food-scanner-session";
 const DRAFT_STORAGE_KEY = "food-scanner-draft";
 const LEGACY_PROFILE_STORAGE_KEY = "food-scanner-profile";
 const LEGACY_HISTORY_STORAGE_KEY = "food-scanner-history";
+const REMOTE_SCAN_SAVE_TIMEOUT_MS = 5000;
 
 type ActionResult = { ok: boolean; error?: string; info?: string };
 
@@ -42,6 +43,8 @@ interface AppStateContextValue {
   reorderFolder: (folderId: string, direction: "up" | "down") => Promise<void>;
   moveScanToFolder: (scanId: string, folderId?: string) => Promise<void>;
   toggleFavorite: (scanId: string) => Promise<void>;
+  updateScanExplanation: (scanId: string, explanation: StructuredExplanation) => Promise<void>;
+  updateScanDietCrossChecks: (scanId: string, dietCrossChecks: DietCrossCheck[]) => Promise<void>;
   updateScanDetails: (scanId: string, payload: { productName?: string; brandName?: string }) => Promise<void>;
   updateScanNote: (scanId: string, note?: string) => Promise<void>;
   saveReflection: (scanId: string, payload: { purchaseIntent?: ReflectionChoice; clarity?: ReflectionChoice }) => Promise<void>;
@@ -56,11 +59,26 @@ const defaultDraft: ScanDraft = {
   productName: "",
   brandName: "",
   ingredientText: "",
+  includeNutritionDetails: false,
   ocrStatus: "idle",
+  ocrText: "",
+  ocrError: "",
+  nutritionOcrStatus: "idle",
+  nutritionOcrText: "",
+  nutritionOcrError: "",
 };
 
-const defaultFolderNames = ["Safe Foods", "Grocery", "Review Later"];
+const defaultFolderNames = ["Go-To Options", "Grocery", "Review Later"];
 const AppStateContext = createContext<AppStateContextValue | null>(null);
+
+function sanitizeDraftForSession(_draft: ScanDraft): ScanDraft {
+  return { ...defaultDraft };
+}
+
+function sanitizeDraftForStorage(draft: ScanDraft): ScanDraft {
+  const { imagePreviewUrl: _imagePreviewUrl, nutritionImagePreviewUrl: _nutritionImagePreviewUrl, ...persistedDraft } = draft;
+  return persistedDraft;
+}
 
 function createUuidFallback(): string {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
@@ -86,15 +104,19 @@ function readStorage<T>(key: string, fallback: T): T {
 
 function persistStorage<T>(key: string, value: T) {
   if (typeof window === "undefined") return;
-  if (typeof value === "undefined") {
-    window.localStorage.removeItem(key);
-    return;
+  try {
+    if (typeof value === "undefined") {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`Could not persist local storage key "${key}".`, error);
   }
-  window.localStorage.setItem(key, JSON.stringify(value));
 }
 
 function getDisplayNameFromEmail(email: string): string {
-  return email.split("@")[0]?.replace(/[._-]+/g, " ")?.replace(/\b\w/g, (match) => match.toUpperCase()) || "Food Scanner User";
+  return email.split("@")[0]?.replace(/[._-]+/g, " ")?.replace(/\b\w/g, (match) => match.toUpperCase()) || "LabelWise User";
 }
 
 function getDefaultFolders(userId: string): ScanFolder[] {
@@ -163,6 +185,11 @@ function fromFolderRow(row: Record<string, unknown>): ScanFolder {
 }
 
 function toScanRow(scan: ScanRecord) {
+  const analysis = {
+    ...scan.analysis,
+    nutritionFacts: scan.nutritionFacts ?? scan.analysis.nutritionFacts,
+  };
+
   return {
     id: scan.id,
     user_id: scan.userId,
@@ -175,7 +202,7 @@ function toScanRow(scan: ScanRecord) {
     ocr_confidence: scan.ocrConfidence ?? null,
     ocr_source: scan.ocrSource ?? null,
     ocr_status_at_save: scan.ocrStatusAtSave ?? null,
-    analysis: scan.analysis,
+    analysis,
     profile_snapshot: scan.profileSnapshot,
     folder_id: scan.folderId ?? null,
     is_favorite: scan.isFavorite,
@@ -184,12 +211,15 @@ function toScanRow(scan: ScanRecord) {
 }
 
 function fromScanRow(row: Record<string, unknown>): ScanRecord {
+  const analysis = row.analysis as ScanRecord["analysis"];
+
   return {
     id: String(row.id),
     userId: String(row.user_id),
     productName: String(row.product_name),
     brandName: typeof row.brand_name === "string" ? row.brand_name : undefined,
     ingredientText: String(row.ingredient_text),
+    nutritionFacts: analysis?.nutritionFacts,
     imageName: typeof row.image_name === "string" ? row.image_name : undefined,
     createdAt: String(row.created_at),
     ocrText: typeof row.ocr_text === "string" ? row.ocr_text : undefined,
@@ -202,7 +232,7 @@ function fromScanRow(row: Record<string, unknown>): ScanRecord {
       row.ocr_status_at_save === "error"
         ? row.ocr_status_at_save
         : undefined,
-    analysis: row.analysis as ScanRecord["analysis"],
+    analysis,
     profileSnapshot: normalizeProfile(row.profile_snapshot as UserProfile),
     folderId: typeof row.folder_id === "string" ? row.folder_id : undefined,
     isFavorite: Boolean(row.is_favorite),
@@ -244,7 +274,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(() => readStorage<string | undefined>(SESSION_STORAGE_KEY, undefined));
   const [supabaseUser, setSupabaseUser] = useState<UserAccount | undefined>(undefined);
   const [selectedScanId, setSelectedScanId] = useState<string | undefined>(undefined);
-  const [draft, setDraft] = useState<ScanDraft>(() => readStorage(DRAFT_STORAGE_KEY, defaultDraft));
+  const [draft, setDraft] = useState<ScanDraft>(() => sanitizeDraftForSession(readStorage(DRAFT_STORAGE_KEY, defaultDraft)));
 
   useEffect(() => persistStorage(ACCOUNTS_STORAGE_KEY, accounts), [accounts]);
   useEffect(() => persistStorage(PROFILES_STORAGE_KEY, profilesByUser), [profilesByUser]);
@@ -253,7 +283,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   useEffect(() => persistStorage(FOLDER_ORDER_STORAGE_KEY, folderOrderByUser), [folderOrderByUser]);
   useEffect(() => persistStorage(REFLECTIONS_STORAGE_KEY, reflections), [reflections]);
   useEffect(() => persistStorage(SESSION_STORAGE_KEY, currentUserId), [currentUserId]);
-  useEffect(() => persistStorage(DRAFT_STORAGE_KEY, draft), [draft]);
+  useEffect(() => persistStorage(DRAFT_STORAGE_KEY, sanitizeDraftForStorage(draft)), [draft]);
 
   const backendMode = isSupabaseConfigured && supabase ? "supabase" : "local";
   const localCurrentUser = useMemo<UserAccount | undefined>(() => {
@@ -482,14 +512,24 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     const normalized = normalizeProfile(nextProfile);
     setProfilesByUser((current) => ({ ...current, [currentUser.id]: normalized }));
     if (backendMode === "supabase" && supabase) {
-      await supabase.from("user_profiles").upsert({
-        user_id: currentUser.id,
-        email: currentUser.email,
-        display_name: currentUser.displayName,
-        preferences: normalized,
-        created_at: currentUser.createdAt,
-        updated_at: new Date().toISOString(),
-      });
+      void supabase
+        .from("user_profiles")
+        .upsert({
+          user_id: currentUser.id,
+          email: currentUser.email,
+          display_name: currentUser.displayName,
+          preferences: normalized,
+          created_at: currentUser.createdAt,
+          updated_at: new Date().toISOString(),
+        })
+        .then(({ error }) => {
+          if (error) {
+            console.error("Remote profile save failed after the local profile was already stored.", error);
+          }
+        })
+        .catch((error) => {
+          console.error("Remote profile save failed after the local profile was already stored.", error);
+        });
     }
   };
 
@@ -499,11 +539,27 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     setScans((current) => [nextRecord, ...current.filter((item) => item.id !== nextRecord.id)]);
     setSelectedScanId(nextRecord.id);
     if (backendMode === "supabase" && supabase) {
-      const { error } = await supabase.from("scan_records").upsert(toScanRow(nextRecord));
-      if (error) {
+      const remoteSavePromise = (async () => await supabase.from("scan_records").upsert(toScanRow(nextRecord)))();
+
+      remoteSavePromise.catch((error) => {
+        console.error("Remote scan save failed after the local scan was already stored.", error);
+      });
+
+      const remoteSaveResult = await Promise.race([
+        remoteSavePromise.then(({ error }) => ({ timedOut: false as const, error })),
+        new Promise<{ timedOut: true }>((resolve) => {
+          window.setTimeout(() => resolve({ timedOut: true }), REMOTE_SCAN_SAVE_TIMEOUT_MS);
+        }),
+      ]);
+
+      if (remoteSaveResult.timedOut) {
+        return { ok: true, info: "Saved locally. Cloud sync may take a little longer." };
+      }
+
+      if (remoteSaveResult.error) {
         setScans((current) => current.filter((item) => item.id !== nextRecord.id));
         setSelectedScanId((current) => (current === nextRecord.id ? undefined : current));
-        return { ok: false, error: error.message };
+        return { ok: false, error: remoteSaveResult.error.message };
       }
     }
     return { ok: true };
@@ -626,6 +682,60 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     }
   };
 
+  const updateScanExplanation = async (scanId: string, explanation: StructuredExplanation) => {
+    const existingScan = history.find((item) => item.id === scanId);
+    if (!existingScan) return;
+
+    const nextScan: ScanRecord = {
+      ...existingScan,
+      analysis: {
+        ...existingScan.analysis,
+        explanation,
+      },
+    };
+
+    setScans((current) => current.map((scan) => (scan.id === scanId ? nextScan : scan)));
+
+    if (backendMode === "supabase" && supabase) {
+      await supabase
+        .from("scan_records")
+        .update({
+          analysis: {
+            ...nextScan.analysis,
+            nutritionFacts: nextScan.nutritionFacts ?? nextScan.analysis.nutritionFacts,
+          },
+        })
+        .eq("id", scanId);
+    }
+  };
+
+  const updateScanDietCrossChecks = async (scanId: string, dietCrossChecks: DietCrossCheck[]) => {
+    const existingScan = history.find((item) => item.id === scanId);
+    if (!existingScan) return;
+
+    const nextScan: ScanRecord = {
+      ...existingScan,
+      analysis: {
+        ...existingScan.analysis,
+        dietCrossChecks,
+      },
+    };
+
+    setScans((current) => current.map((scan) => (scan.id === scanId ? nextScan : scan)));
+
+    if (backendMode === "supabase" && supabase) {
+      await supabase
+        .from("scan_records")
+        .update({
+          analysis: {
+            ...nextScan.analysis,
+            nutritionFacts: nextScan.nutritionFacts ?? nextScan.analysis.nutritionFacts,
+          },
+        })
+        .eq("id", scanId);
+    }
+  };
+
   const updateScanDetails = async (scanId: string, payload: { productName?: string; brandName?: string }) => {
     const nextProductName = payload.productName?.trim();
     const nextBrandName = payload.brandName?.trim();
@@ -699,6 +809,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       reorderFolder,
       moveScanToFolder,
       toggleFavorite,
+      updateScanExplanation,
+      updateScanDietCrossChecks,
       updateScanDetails,
       updateScanNote,
       saveReflection,

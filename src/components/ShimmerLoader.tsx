@@ -6,7 +6,7 @@ const ShimmerLoader = () => (
         className="h-[80px] rounded-xl bg-gradient-to-r from-secondary via-card to-secondary bg-[length:200%_100%] animate-shimmer"
       />
     ))}
-    <p className="text-center text-sm text-muted-foreground mt-[16px]">Analyzing ingredients...</p>
+    <p className="text-center text-sm text-muted-foreground mt-[16px]">Analyzing label...</p>
   </div>
 );
 

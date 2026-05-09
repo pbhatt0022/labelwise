@@ -1,11 +1,17 @@
 {
-  "name": "Food Scanner",
-  "short_name": "FoodScanner",
+  "name": "LabelWise",
+  "short_name": "LabelWise",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f1f5f1",
   "theme_color": "#113d38",
   "icons": [
+    {
+      "src": "/labelwise-leaf.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/favicon.ico",
       "sizes": "48x48 32x32 16x16",

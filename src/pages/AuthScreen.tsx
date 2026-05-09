@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppState } from "@/context/AppStateContext";
+import { hasProfileSelections } from "@/lib/analysis";
 import { ArrowRight, KeyRound, Leaf, LogIn, UserPlus } from "lucide-react";
 
 const AuthScreen = () => {
@@ -18,13 +19,7 @@ const AuthScreen = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const hasPreferences =
-        profile.allergies.length > 0 ||
-        profile.health.length > 0 ||
-        profile.diet.length > 0 ||
-        profile.sensitivities.length > 0 ||
-        profile.customAvoids.length > 0;
-      navigate(hasPreferences ? "/home" : "/profile-setup", { replace: true });
+      navigate(hasProfileSelections(profile) ? "/home" : "/profile-setup", { replace: true });
     }
   }, [isAuthenticated, navigate, profile]);
 
@@ -50,9 +45,9 @@ const AuthScreen = () => {
             <div className="mx-auto mb-[16px] flex h-[72px] w-[72px] items-center justify-center rounded-full bg-accent/20">
               <Leaf size={32} className="text-accent" />
             </div>
-            <h1 className="text-[28px] font-bold text-primary-foreground">Food Scanner</h1>
+            <h1 className="text-[28px] font-bold text-primary-foreground">LabelWise</h1>
             <p className="mt-[8px] text-sm leading-relaxed text-primary-foreground/70">
-              A health psychology-led label literacy tool that reduces confusion, translates hidden ingredients, and helps you save foods for later decisions.
+                A facts-first, psychology-informed food-label literacy coach that helps you read ingredients and nutrition context without turning the experience into calorie tracking.
             </p>
           </div>
 
@@ -106,10 +101,13 @@ const AuthScreen = () => {
               <KeyRound size={16} /> Why create an account?
             </div>
             <p>
-              Your preferences, saved scans, custom folders, favorites, and reflections stay linked to your personal Food Scanner workspace.
+              Your preferences, saved scans, custom folders, favorites, and reflections stay linked to your personal LabelWise workspace.
             </p>
             <p className="mt-[8px] text-xs text-primary-foreground/70">
               Backend mode: {backendMode === "supabase" ? "Supabase hosted auth + database" : "Local fallback until Supabase keys are configured"}
+            </p>
+            <p className="mt-[8px] text-xs text-primary-foreground/70">
+              Educational guidance only. LabelWise does not diagnose conditions, prescribe diets, or give medical advice.
             </p>
           </div>
         </div>
