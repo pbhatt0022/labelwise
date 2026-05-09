@@ -32,3 +32,4 @@ dist-ssr
 # Local test assets
 test_images/
 video/
+demo/

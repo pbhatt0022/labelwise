@@ -500,8 +500,20 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     if (backendMode === "supabase" && supabase) {
       await supabase.auth.signOut();
       setSupabaseUser(undefined);
+      // Clear all locally cached data — it is safely backed up in Supabase
+      setScans([]);
+      setFolders([]);
+      setReflections([]);
+      setProfilesByUser({});
+      setFolderOrderByUser({});
+      [SCANS_STORAGE_KEY, FOLDERS_STORAGE_KEY, REFLECTIONS_STORAGE_KEY,
+       PROFILES_STORAGE_KEY, FOLDER_ORDER_STORAGE_KEY, DRAFT_STORAGE_KEY,
+       SESSION_STORAGE_KEY].forEach((key) => window.localStorage.removeItem(key));
     } else {
+      // Local mode: only clear session and draft — wiping data would destroy it permanently
       setCurrentUserId(undefined);
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
     }
     setSelectedScanId(undefined);
     setDraft(defaultDraft);

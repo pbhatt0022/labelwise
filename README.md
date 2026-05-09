@@ -1,30 +1,60 @@
 # LabelWise
 
-**LabelWise** is a facts-first, psychology-informed, AI-assisted food-label literacy coach.
+**LabelWise** is a facts-first, psychology-informed, AI-assisted food-label literacy app.
 
-It is intentionally **not** positioned as a generic barcode scanner, calorie tracker, dieting app, or weight-loss tool. LabelWise helps people read the **actual label** on a packaged food, understand what it says, and reflect on what may be relevant for them.
+It is intentionally **not** a barcode scanner, calorie tracker, dieting app, or weight-loss tool. LabelWise helps people read the **actual label** on a packaged food, understand what it says, and reflect on what may be relevant for them — matched to their own saved preferences.
 
-## What Makes LabelWise Different?
+---
 
-Many food apps depend on barcode lookup and product databases. That approach can break when the product is:
+## Demo
+
+**Demo Video** — overview, research framing, and live feature walkthrough with voiceover
+
+[![Watch the LabelWise Demo](https://img.youtube.com/vi/Y_wO1iJ5YHY/maxresdefault.jpg)](https://youtu.be/Y_wO1iJ5YHY)
+
+**App Tutorial** — full screen recording walkthrough of every feature and screen
+
+[![Watch the LabelWise App Tutorial](https://img.youtube.com/vi/SWw5AXbbv6o/maxresdefault.jpg)](https://youtu.be/SWw5AXbbv6o)
+
+---
+
+## Why This Was Built
+
+Consumer research consistently shows that label-reading awareness is high, but functional use is low. Studies report that most people notice nutrition labels, yet fewer than half use them to make a decision. The gap is not motivation — it is access to understanding.
+
+Most food-label apps assume you already understand what you are reading, or they replace reading entirely with a barcode lookup. Neither approach builds food-label literacy.
+
+This project started from a research report on health psychology and consumer behaviour (see [`docs/LabelWise Report.pdf`](docs/LabelWise%20Report.pdf)) that examined why that gap exists and what a better intervention might look like. LabelWise is the practical outcome: an app grounded in the **COM-B model of behaviour change** that works from the actual text on the label rather than a product database.
+
+**Capability** — translates technical ingredient names, INS codes, and nutrition figures into simpler, contextualised language.  
+**Opportunity** — supports in-the-moment label reading on a mobile-friendly interface during a real shopping trip.  
+**Motivation** — makes findings personally relevant through allergies, sensitivities, diet preferences, custom avoids, and user-defined food-label preferences.
+
+---
+
+## What Makes LabelWise Different
+
+Most food apps use barcode lookup. That breaks when the product is:
 
 - local or regional
 - newly launched
 - from a small brand
 - imported or repackaged
-- incomplete or missing in a database
+- absent from or incomplete in any product database
 
 LabelWise is designed to keep working when barcode-first products fail:
 
-- OCR-based ingredient label extraction
-- manual correction after OCR
-- manual ingredient entry fallback
-- manual nutrition entry fallback
-- local rule-based analysis
-- personalized saved preferences
-- saved scans, notes, favorites, and folders for grocery planning
+- OCR-based ingredient label extraction (camera or photo upload)
+- Manual correction after OCR
+- Manual ingredient entry fallback
+- Manual nutrition entry fallback
+- Local rule-based analysis engine — no product database required
+- Personalised saved preferences
+- Saved scans, notes, favorites, and folders for grocery planning
 
-This makes LabelWise especially useful for **Indian packaged foods**, regional products, and mixed retail environments where database coverage is inconsistent.
+This makes LabelWise especially useful for regional packaged foods and mixed retail environments where database coverage is inconsistent.
+
+---
 
 ## Product Positioning
 
@@ -44,62 +74,25 @@ LabelWise avoids:
 - medical claims
 - diagnosis or treatment advice
 
-The interface uses calmer phrases such as:
+The interface uses phrases such as `Good to know`, `Worth reviewing`, `Matched your saved preference`, and `Consider another product`.
 
-- `Good to know`
-- `Worth reviewing`
-- `Matched your saved preference`
-- `Consider another product`
+---
 
-## Health Psychology Framing
+## Features
 
-The app is grounded primarily in the **COM-B model of behaviour change**, with light-touch **nudge principles**.
+- Account-based sign in with Supabase or a local fallback (no network required)
+- OCR-powered ingredient extraction in the browser via Tesseract.js or optional AWS Textract
+- Manual ingredient correction and full manual entry fallback
+- Profile-based ingredient analysis using a local rule engine
+- Facts-first dietary compatibility engine for Vegan, Vegetarian, Keto-style, Gluten-free, Dairy-free, and Nut-free
+- Custom avoids — add any ingredient or group you personally want to flag
+- Optional food-label preferences for sugar, sodium, and saturated fat
+- Nutrition Reality Check with manual per-serving nutrition entry
+- Template-based Smart Explanation Mode that works without an API key
+- Optional Gemini-powered AI summary with personalised plain-language explanation
+- Saved scans, notes, favorites, and folders such as `Go-To Options`, `Grocery`, and `Review Later`
 
-- **Capability**: translates technical ingredient names, INS codes, and nutrition context into simpler language
-- **Opportunity**: supports in-the-moment label reading during shopping on a mobile-friendly interface
-- **Motivation**: makes findings personally relevant through allergies, sensitivities, diet preferences, custom avoids, and optional food-label preferences
-
-The goal is not to tell users what they must eat. The goal is to help them **understand the label better**.
-
-## Current Hackathon Features
-
-- account-based sign in with Supabase or local fallback
-- OCR-powered ingredient extraction in the browser
-- manual ingredient correction and manual entry fallback
-- profile-based ingredient analysis using a local rule engine
-- a facts-first dietary compatibility engine for vegan, vegetarian, keto-style, gluten-free, dairy-free, nut-free, and custom avoids
-- optional food-label preferences for sugar, sodium, and saturated fat
-- `Nutrition Reality Check` with manual per-serving nutrition entry
-- template-based `Smart Explanation Mode`
-
-## Optional AWS Textract OCR
-
-If you want stronger OCR than the in-browser Tesseract fallback, LabelWise can call AWS Textract through a small local proxy.
-
-Add these values to your local `.env.local`:
-
-```env
-VITE_TEXTRACT_ENDPOINT=http://127.0.0.1:8787/api/ocr/textract
-AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_ACCESS_KEY
-AWS_REGION=us-east-1
-```
-
-Then run the proxy in one terminal:
-
-```bash
-npm run dev:textract
-```
-
-And the app in another:
-
-```bash
-npm run dev -- --host
-```
-
-When the proxy is unavailable, LabelWise automatically falls back to local Tesseract OCR.
-- optional Gemini-powered `AI-assisted summary` with template fallback
-- saved scans, notes, favorites, and folders such as `Go-To Options`, `Grocery`, and `Review Later`
+---
 
 ## Facts-First Architecture
 
@@ -107,9 +100,9 @@ LabelWise does **not** use AI as the source of truth.
 
 Structured analysis is grounded in:
 
-- curated ingredient rules
+- curated ingredient concern rules
 - curated dietary compatibility rules
-- additive and INS-code mappings where available
+- additive and INS-code mappings
 - user-defined allergies, sensitivities, diet preferences, and custom avoids
 - nutrition values entered from the label
 - user-defined food-label preferences
@@ -118,88 +111,134 @@ Structured analysis is grounded in:
 AI is limited to the explanation layer:
 
 - plain-language summaries
-- student-friendly phrasing
 - simpler wording for technical terms
-- optional Gemini-powered personalized explanation on the results screen
-- optional AI review hints that never set the final compatibility label
+- optional Gemini-powered personalised explanation on the results screen
+- optional AI review hints that never override the final compatibility label
 
-If no LLM is configured, the app uses a built-in template-based explanation mode.
+If no Gemini API key is configured the app falls back to built-in template-based explanations.
 
-## Diet Compatibility
+---
 
-LabelWise includes a transparent dietary compatibility engine based on visible ingredient text and curated rules.
+## Dietary Compatibility
 
-- `Not compatible`: a visible ingredient directly conflicts with the selected preference
-- `Needs review`: the ingredient source may vary by manufacturer or the wording is ambiguous
-- `Compatible`: no obvious issue was found in the visible ingredient list
-- `Unknown`: there was not enough visible ingredient text to classify confidently
+The compatibility engine uses visible ingredient text and curated rules.
 
-This compatibility engine is rule-based. AI is **not** the source of truth for dietary classification.
+| Result | Meaning |
+|--------|---------|
+| `Not compatible` | A visible ingredient directly conflicts with the selected preference |
+| `Needs review` | The ingredient source may vary by manufacturer or the wording is ambiguous |
+| `Compatible` | No obvious issue was found in the visible ingredient list |
+| `Unknown` | Not enough visible ingredient text to classify confidently |
 
-Safety copy used in the product:
+This engine is rule-based. AI is not the source of truth for dietary classification.
 
-`Diet compatibility is based on visible label text and curated rules. Ingredient origins can vary by manufacturer. Please review the package and consult qualified professionals for allergies or medical dietary needs.`
+> Diet compatibility is based on visible label text and curated rules. Ingredient origins can vary by manufacturer. Please review the package and consult qualified professionals for allergies or medical dietary needs.
+
+---
 
 ## Safety Boundaries
 
-LabelWise is:
+LabelWise is educational, non-diagnostic, non-restrictive, and transparent. It is **not medical advice**. It does not diagnose conditions, determine medical safety, prescribe diets, or declare any food forbidden.
 
-- educational
-- non-diagnostic
-- non-restrictive
-- transparent
-
-It is **not medical advice**. It does not diagnose conditions, determine medical safety, prescribe diets, or tell users that a food is forbidden.
+---
 
 ## Demo Examples
 
-The current app includes fixed demo examples that show the core novelty:
+The app includes four fixed demo examples chosen to show the core novelty to judges quickly:
 
-- a `High protein` cereal with notable sugar context
-- a `No added sugar` snack with sweetening-related ingredients
-- a `Multigrain` khakhra example for local/regional packaged-food context
-- a `Healthy snack` makhana mix with visible ingredient and nutrition context
-- a `Vegan review` example with whey and milk powder
-- a `Vegetarian review` example with gelatin and rennet
-- a `Low-carb review` example with sugar, maltodextrin, and refined flour
-- a `Gluten-free review` example with wheat, barley malt, and oats
+| Demo | What it shows |
+|------|--------------|
+| High protein cereal | A protein-forward cereal that still carries notable sugar and sodium context |
+| No added sugar bites | A lower-sugar-style snack where ingredient context still matters (maltodextrin, sorbitol) |
+| Vegan review example | How whey and milk powder trigger a facts-first vegan compatibility check |
+| Low-carb review example | How sugar, maltodextrin, and refined flour are caught in a keto-style check |
 
-These demos are meant to help judges quickly understand:
+These demos highlight why LabelWise is not just another barcode app and why OCR-and-manual-entry-first design matters.
 
-- why LabelWise is not just another barcode app
-- why it is not a calorie tracker
-- why OCR/manual-entry-first design matters
-
-## Repository Guide
-
-- [src](C:/Users/priya/OneDrive/Documents/Health%20Psychology%20App/src): React application code
-- [supabase](C:/Users/priya/OneDrive/Documents/Health%20Psychology%20App/supabase): Supabase setup and schema
-- [docs](C:/Users/priya/OneDrive/Documents/Health%20Psychology%20App/docs): hackathon and report materials
-- [docs/devpost-submission.md](C:/Users/priya/OneDrive/Documents/Health%20Psychology%20App/docs/devpost-submission.md): judge-facing project write-up
-- [docs/LabelWise Report.pdf](C:/Users/priya/OneDrive/Documents/Health%20Psychology%20App/docs/LabelWise%20Report.pdf): report material
+---
 
 ## Tech Stack
 
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- shadcn/ui
-- Supabase
-- Tesseract.js
-- Vitest
+| Layer | Technology |
+|-------|-----------|
+| Frontend framework | React 18 + TypeScript |
+| Build tool | Vite |
+| Styling | Tailwind CSS + shadcn/ui |
+| Icons | Lucide React |
+| State management | React Context + TanStack React Query |
+| Auth + database | Supabase (PostgreSQL with Row Level Security) |
+| OCR (browser) | Tesseract.js |
+| OCR (optional, stronger) | AWS Textract via local proxy |
+| AI analysis | Google Gemini API (`gemini-2.5-flash-lite` default) |
+| Testing | Vitest + Testing Library |
+
+---
+
+## Repository Structure
+
+```
+├── docs/                         Hackathon materials and research report
+│   ├── LabelWise Report.pdf      The health psychology research behind this project
+│   └── devpost-submission.md     Judge-facing project write-up
+├── server/                       Local AWS Textract proxy (optional)
+├── src/
+│   ├── components/               Reusable UI components
+│   ├── context/                  Global app state (AppStateContext)
+│   ├── data/                     Curated ingredient and diet rule databases
+│   │   ├── ingredientKnowledge.ts   Ingredient entities, aliases, and concern rules
+│   │   ├── dietRules.ts             Dietary compatibility rules
+│   │   ├── demoScans.ts             Fixed demo examples
+│   │   └── profileOptions.ts        Profile configuration options
+│   ├── hooks/                    Custom React hooks
+│   ├── lib/                      Core logic
+│   │   ├── analysis.ts              Rule-based ingredient analysis engine
+│   │   ├── dietCompatibility.ts     Dietary compatibility matching
+│   │   ├── gemini.ts                Google Gemini integration
+│   │   ├── ocr.ts                   OCR orchestration (Tesseract + Textract)
+│   │   ├── nutrition.ts             Nutrition context calculations
+│   │   ├── types.ts                 TypeScript type definitions
+│   │   └── supabase.ts              Supabase client initialisation
+│   ├── pages/                    Screen components (9 routes)
+│   └── test/                     Test suite
+├── supabase/
+│   └── schema.sql                Database schema and RLS policies
+├── .env.example                  Environment variable template
+└── vite.config.ts                Vite config with Textract proxy plugin
+```
+
+---
 
 ## Local Development
 
 ### Prerequisites
 
-- Node.js
-- npm
+- Node.js 18+ (or Bun)
+- npm (or bun)
 
 ### Install dependencies
 
 ```sh
 npm install
+```
+
+### Environment setup
+
+Copy `.env.example` to `.env` and fill in your values:
+
+```sh
+cp .env.example .env
+```
+
+```env
+# Required for cloud auth and data persistence
+# Without these the app runs in local-only demo mode
+VITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+
+# Required for AI-powered explanations
+# Without this the app falls back to template-based summaries
+VITE_GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+VITE_GEMINI_MODEL=gemini-2.5-flash-lite
 ```
 
 ### Run the development server
@@ -222,41 +261,66 @@ npm test
 npm run build
 ```
 
-## Environment Setup
-
-Create a local `.env` file based on [.env.example](C:/Users/priya/OneDrive/Documents/Health%20Psychology%20App/.env.example):
-
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_GEMINI_API_KEY=your_gemini_api_key
-VITE_GEMINI_MODEL=gemini-2.5-flash-lite
-```
-
-If Supabase keys are not configured, the app can fall back to local demo persistence.
-If the Gemini key is not configured, LabelWise falls back to local template-based summaries.
+---
 
 ## Supabase Setup
 
-1. Create a Supabase project.
-2. Add the keys to `.env`.
-3. Run the SQL in [schema.sql](C:/Users/priya/OneDrive/Documents/Health%20Psychology%20App/supabase/schema.sql).
+1. Create a new project at [supabase.com](https://supabase.com).
+2. Copy the project URL and anon key into your `.env`.
+3. In the Supabase SQL editor, run the full schema from [`supabase/schema.sql`](supabase/schema.sql). This creates the `user_profiles`, `scan_records`, `scan_folders`, and `reflection_entries` tables with Row Level Security policies.
+
+If Supabase is not configured the app falls back to local browser storage — useful for demos and offline use.
+
+---
+
+## Optional: AWS Textract OCR
+
+For stronger OCR than the in-browser Tesseract fallback, LabelWise can call AWS Textract through a small local proxy.
+
+Create a `.env.local` file (in addition to `.env`) with your AWS credentials:
+
+```env
+VITE_TEXTRACT_ENDPOINT=http://127.0.0.1:8787/api/ocr/textract
+AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_ACCESS_KEY
+AWS_REGION=us-east-1
+```
+
+Run the proxy in one terminal:
+
+```sh
+npm run dev:textract
+```
+
+And the app in another:
+
+```sh
+npm run dev -- --host
+```
+
+When the proxy is unavailable or unconfigured, LabelWise automatically falls back to Tesseract.
+
+---
 
 ## Current Limitations
 
-- OCR quality still depends on image clarity and cropping
-- ingredient coverage is curated and still growing
-- nutrition facts are manual-entry-first in this version
-- health-concern logic has been intentionally removed from the user-facing profile flow until it can be rebuilt more rigorously
-- the current prototype is English-first, with room for multilingual and Hinglish explanation later
+- OCR quality depends on image clarity and cropping
+- Ingredient coverage is curated and still growing
+- Nutrition facts are manual-entry-first in this version
+- The prototype is English-first; multilingual support is a future goal
+- Health-concern scoring based on clinical evidence thresholds is a planned future layer
 
 Possible enrichment sources for future rule expansion:
 
 - [Open Food Facts](https://world.openfoodfacts.org/)
 - [USDA FoodData Central](https://fdc.nal.usda.gov/)
 
-Future work may include a stronger nutrition-grounded health-context layer once it can be implemented with clearer safety boundaries and more robust evidence handling.
+---
 
-## Repository Description
+## Research Reference
 
-**LabelWise**: A facts-first, psychology-informed food-label literacy coach that reads the actual label through OCR or manual entry, then explains ingredient, nutrition, and diet-compatibility context without becoming a calorie tracker or medical tool.
+This project is grounded in original health psychology research. The full report is available at [`docs/LabelWise Report.pdf`](docs/LabelWise%20Report.pdf). It covers the label-reading gap, COM-B model application, nudge principles, and the design rationale behind the facts-first architecture.
+
+---
+
+**LabelWise**: A facts-first, psychology-informed food-label literacy coach that reads the actual label through OCR or manual entry, then explains ingredient, nutrition, and diet-compatibility context — matched to what you already care about, without becoming a calorie tracker or medical tool.
