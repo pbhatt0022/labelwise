@@ -1,5 +1,7 @@
 # LabelWise
 
+**Live app: [labelwise-nine.vercel.app](https://labelwise-nine.vercel.app)**
+
 **LabelWise** is a facts-first, psychology-informed, AI-assisted food-label literacy app.
 
 It is intentionally **not** a barcode scanner, calorie tracker, dieting app, or weight-loss tool. LabelWise helps people read the **actual label** on a packaged food, understand what it says, and reflect on what may be relevant for them — matched to their own saved preferences.
