@@ -269,6 +269,10 @@ npm run build
 2. Copy the project URL and anon key into your `.env`.
 3. In the Supabase SQL editor, run the full schema from [`supabase/schema.sql`](supabase/schema.sql). This creates the `user_profiles`, `scan_records`, `scan_folders`, and `reflection_entries` tables with Row Level Security policies.
 
+### Database schema
+
+![Database schema](docs/schema.png)
+
 If Supabase is not configured the app falls back to local browser storage — useful for demos and offline use.
 
 ---
