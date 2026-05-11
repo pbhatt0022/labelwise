@@ -263,6 +263,7 @@ export interface ScanRecord {
   analysis: AnalysisResult;
   profileSnapshot: UserProfile;
   folderId?: string;
+  folderIds?: string[];
   isFavorite: boolean;
   userNote?: string;
 }

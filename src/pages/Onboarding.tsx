@@ -23,14 +23,14 @@ const slides = [
 const Onboarding = () => {
   const [step, setStep] = useState(0);
   const navigate = useNavigate();
-  const { isAuthenticated, profile } = useAppState();
+  const { isAuthenticated, isRemoteDataLoading, profile } = useAppState();
   const profileReady = hasProfileSelections(profile);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isRemoteDataLoading) {
       navigate(profileReady ? "/home" : "/profile-setup", { replace: true });
     }
-  }, [isAuthenticated, navigate, profileReady]);
+  }, [isAuthenticated, isRemoteDataLoading, navigate, profileReady]);
 
   return (
     <div className="min-h-screen bg-primary flex flex-col items-center justify-center px-[24px]">

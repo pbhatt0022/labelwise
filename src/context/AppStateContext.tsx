@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 
 import { getDefaultProfile, normalizeProfile } from "@/lib/analysis";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { applyScanFolderIds, getPrimaryScanFolderId, getScanFolderIds, scanHasFolder } from "@/lib/scanFolders";
+import { isSupabaseConfigured, supabase, supabaseData } from "@/lib/supabase";
 import type { DietCrossCheck, ReflectionChoice, ReflectionEntry, ScanDraft, ScanFolder, ScanRecord, StructuredExplanation, UserAccount, UserProfile } from "@/lib/types";
 
 const ACCOUNTS_STORAGE_KEY = "food-scanner-accounts";
@@ -15,12 +16,13 @@ const DRAFT_STORAGE_KEY = "food-scanner-draft";
 const LEGACY_PROFILE_STORAGE_KEY = "food-scanner-profile";
 const LEGACY_HISTORY_STORAGE_KEY = "food-scanner-history";
 const REMOTE_SCAN_SAVE_TIMEOUT_MS = 5000;
-
 type ActionResult = { ok: boolean; error?: string; info?: string };
 
 interface AppStateContextValue {
   currentUser?: UserAccount;
   isAuthenticated: boolean;
+  isAuthResolved: boolean;
+  isRemoteDataLoading: boolean;
   backendMode: "supabase" | "local";
   profile: UserProfile;
   history: ScanRecord[];
@@ -41,7 +43,7 @@ interface AppStateContextValue {
   renameFolder: (folderId: string, name: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   reorderFolder: (folderId: string, direction: "up" | "down") => Promise<void>;
-  moveScanToFolder: (scanId: string, folderId?: string) => Promise<void>;
+  updateScanFolders: (scanId: string, folderIds: string[]) => Promise<void>;
   toggleFavorite: (scanId: string) => Promise<void>;
   updateScanExplanation: (scanId: string, explanation: StructuredExplanation) => Promise<void>;
   updateScanDietCrossChecks: (scanId: string, dietCrossChecks: DietCrossCheck[]) => Promise<void>;
@@ -204,7 +206,8 @@ function toScanRow(scan: ScanRecord) {
     ocr_status_at_save: scan.ocrStatusAtSave ?? null,
     analysis,
     profile_snapshot: scan.profileSnapshot,
-    folder_id: scan.folderId ?? null,
+    folder_id: getPrimaryScanFolderId(scan) ?? null,
+    folder_ids: getScanFolderIds(scan),
     is_favorite: scan.isFavorite,
     user_note: scan.userNote ?? null,
   };
@@ -212,6 +215,8 @@ function toScanRow(scan: ScanRecord) {
 
 function fromScanRow(row: Record<string, unknown>): ScanRecord {
   const analysis = row.analysis as ScanRecord["analysis"];
+  const legacyFolderId = typeof row.folder_id === "string" ? row.folder_id : undefined;
+  const folderIds = Array.isArray(row.folder_ids) ? row.folder_ids.filter((value): value is string => typeof value === "string") : [];
 
   return {
     id: String(row.id),
@@ -234,7 +239,7 @@ function fromScanRow(row: Record<string, unknown>): ScanRecord {
         : undefined,
     analysis,
     profileSnapshot: normalizeProfile(row.profile_snapshot as UserProfile),
-    folderId: typeof row.folder_id === "string" ? row.folder_id : undefined,
+    ...applyScanFolderIds({ folderId: legacyFolderId, folderIds }, folderIds.length > 0 ? folderIds : legacyFolderId ? [legacyFolderId] : []),
     isFavorite: Boolean(row.is_favorite),
     userNote: typeof row.user_note === "string" ? row.user_note : undefined,
   };
@@ -273,8 +278,12 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   const [reflections, setReflections] = useState<ReflectionEntry[]>(() => readStorage(REFLECTIONS_STORAGE_KEY, []));
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(() => readStorage<string | undefined>(SESSION_STORAGE_KEY, undefined));
   const [supabaseUser, setSupabaseUser] = useState<UserAccount | undefined>(undefined);
+  const [isAuthResolved, setIsAuthResolved] = useState(!(isSupabaseConfigured && Boolean(supabase)));
+  const [isRemoteDataLoading, setIsRemoteDataLoading] = useState(false);
   const [selectedScanId, setSelectedScanId] = useState<string | undefined>(undefined);
   const [draft, setDraft] = useState<ScanDraft>(() => sanitizeDraftForSession(readStorage(DRAFT_STORAGE_KEY, defaultDraft)));
+  const pendingRemoteScanSavesRef = useRef(new Set<Promise<{ error: { message: string } | null }>>());
+  const pendingRemoteProfileSavesRef = useRef(new Set<Promise<{ error: { message: string } | null }>>());
 
   useEffect(() => persistStorage(ACCOUNTS_STORAGE_KEY, accounts), [accounts]);
   useEffect(() => persistStorage(PROFILES_STORAGE_KEY, profilesByUser), [profilesByUser]);
@@ -285,7 +294,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   useEffect(() => persistStorage(SESSION_STORAGE_KEY, currentUserId), [currentUserId]);
   useEffect(() => persistStorage(DRAFT_STORAGE_KEY, sanitizeDraftForStorage(draft)), [draft]);
 
-  const backendMode = isSupabaseConfigured && supabase ? "supabase" : "local";
+  const remoteDb = supabaseData ?? supabase;
+  const backendMode = isSupabaseConfigured && supabase && remoteDb ? "supabase" : "local";
   const localCurrentUser = useMemo<UserAccount | undefined>(() => {
     const account = accounts.find((item) => item.id === currentUserId);
     if (!account) return undefined;
@@ -320,11 +330,11 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   };
 
   const ensureStarterFoldersRemote = async (userId: string) => {
-    if (!supabase) return;
-    const { data, error } = await supabase.from("scan_folders").select("id").eq("user_id", userId).limit(1);
+    if (!remoteDb) return;
+    const { data, error } = await remoteDb.from("scan_folders").select("id").eq("user_id", userId).limit(1);
     if (error || (data ?? []).length > 0) return;
     const starterFolders = getDefaultFolders(userId);
-    await supabase.from("scan_folders").insert(starterFolders.map(toFolderRow));
+    await remoteDb.from("scan_folders").insert(starterFolders.map(toFolderRow));
     setFolderOrderByUser((current) => ({ ...current, [userId]: starterFolders.map((folder) => folder.id) }));
   };
 
@@ -339,13 +349,13 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   };
 
   const importLegacyDataRemote = async (user: UserAccount) => {
-    if (!supabase) return;
+    if (!remoteDb) return;
     const legacyProfile = readStorage<UserProfile | undefined>(LEGACY_PROFILE_STORAGE_KEY, undefined);
     const legacyHistory = readStorage<ScanRecord[]>(LEGACY_HISTORY_STORAGE_KEY, []);
 
-    const { data: existingProfile } = await supabase.from("user_profiles").select("user_id").eq("user_id", user.id).maybeSingle();
+    const { data: existingProfile } = await remoteDb.from("user_profiles").select("user_id").eq("user_id", user.id).maybeSingle();
     if (!existingProfile) {
-      await supabase.from("user_profiles").upsert({
+      await remoteDb.from("user_profiles").upsert({
         user_id: user.id,
         email: user.email,
         display_name: user.displayName,
@@ -355,24 +365,41 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       });
     }
 
-    const { data: existingScans } = await supabase.from("scan_records").select("id").eq("user_id", user.id).limit(1);
+    const { data: existingScans } = await remoteDb.from("scan_records").select("id").eq("user_id", user.id).limit(1);
     if ((existingScans ?? []).length === 0 && legacyHistory.length > 0) {
-      await supabase.from("scan_records").upsert(
+      await remoteDb.from("scan_records").upsert(
         legacyHistory.map((scan) => toScanRow({ ...scan, userId: user.id, isFavorite: scan.isFavorite ?? false })),
       );
     }
   };
 
   const loadRemoteData = async (user: UserAccount) => {
-    if (!supabase) return;
-    await ensureStarterFoldersRemote(user.id);
+    if (!remoteDb) return;
+    try {
+      await ensureStarterFoldersRemote(user.id);
+    } catch (err) {
+      console.error("[LabelWise] ensureStarterFoldersRemote threw:", err);
+    }
 
-    const [profileResult, foldersResult, scansResult, reflectionsResult] = await Promise.all([
-      supabase.from("user_profiles").select("*").eq("user_id", user.id).maybeSingle(),
-      supabase.from("scan_folders").select("*").eq("user_id", user.id).order("sort_index", { ascending: true }).order("created_at", { ascending: true }),
-      supabase.from("scan_records").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-      supabase.from("reflection_entries").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results: any[] | null = await Promise.all([
+      remoteDb.from("user_profiles").select("*").eq("user_id", user.id).maybeSingle(),
+      remoteDb.from("scan_folders").select("*").eq("user_id", user.id).order("sort_index", { ascending: true }).order("created_at", { ascending: true }),
+      remoteDb.from("scan_records").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      remoteDb.from("reflection_entries").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+    ]).catch((err) => {
+      console.error("[LabelWise] loadRemoteData threw:", err);
+      return null;
+    });
+
+    if (!results) return;
+
+    const [profileResult, foldersResult, scansResult, reflectionsResult] = results;
+
+    if (profileResult.error || foldersResult.error || scansResult.error || reflectionsResult.error) {
+      console.error("[LabelWise] loadRemoteData query errors:", { profileResult, foldersResult, scansResult, reflectionsResult });
+      return;
+    }
 
     if (profileResult.data) {
       setProfilesByUser((current) => ({
@@ -393,29 +420,45 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   };
 
   useEffect(() => {
-    if (!supabase || !isSupabaseConfigured) return;
+    if (!supabase || !remoteDb || !isSupabaseConfigured) return;
 
     let active = true;
+    setIsAuthResolved(false);
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       if (data.session?.user) {
+        setIsRemoteDataLoading(true);
         const user = mapSupabaseUser(data.session.user);
         setSupabaseUser(user);
         await importLegacyDataRemote(user);
         await loadRemoteData(user);
+        if (!active) return;
+        setIsRemoteDataLoading(false);
       } else {
         setSupabaseUser(undefined);
+        setIsRemoteDataLoading(false);
       }
+      setIsAuthResolved(true);
+    }).catch((error) => {
+      console.error("[LabelWise] initial auth restore failed:", error);
+      if (!active) return;
+      setSupabaseUser(undefined);
+      setIsRemoteDataLoading(false);
+      setIsAuthResolved(true);
     });
 
     const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
+        setIsRemoteDataLoading(true);
         const user = mapSupabaseUser(session.user);
         setSupabaseUser(user);
         await importLegacyDataRemote(user);
         await loadRemoteData(user);
+        if (!active) return;
+        setIsRemoteDataLoading(false);
       } else {
         setSupabaseUser(undefined);
+        setIsRemoteDataLoading(false);
       }
     });
 
@@ -438,24 +481,32 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       });
       if (error) return { ok: false, error: error.message };
       if (!data.user) return { ok: false, error: "We could not create that account." };
-
-      const user = mapSupabaseUser({ ...data.user, user_metadata: { ...data.user.user_metadata, display_name: nextDisplayName } });
-      setSupabaseUser(user);
-      await ensureStarterFoldersRemote(user.id);
-      await supabase.from("user_profiles").upsert({
-        user_id: user.id,
-        email: user.email,
-        display_name: user.displayName,
-        preferences: normalizeProfile(readStorage<UserProfile | undefined>(LEGACY_PROFILE_STORAGE_KEY, undefined) ?? getDefaultProfile()),
-        created_at: user.createdAt,
-        updated_at: new Date().toISOString(),
-      });
-      await importLegacyDataRemote(user);
-      await loadRemoteData(user);
       if (!data.session) {
+        // Supabase can create the user before issuing a browser session when email confirmation is enabled.
+        // In that state, the user should confirm their email and explicitly log in before we treat them as authenticated.
+        setSupabaseUser(undefined);
         return { ok: true, info: "Account created. If email confirmation is enabled in Supabase, confirm your email and then log in." };
       }
-      return { ok: true };
+
+      const user = mapSupabaseUser({ ...data.user, user_metadata: { ...data.user.user_metadata, display_name: nextDisplayName } });
+      setIsRemoteDataLoading(true);
+      setSupabaseUser(user);
+      try {
+        await ensureStarterFoldersRemote(user.id);
+        await remoteDb.from("user_profiles").upsert({
+          user_id: user.id,
+          email: user.email,
+          display_name: user.displayName,
+          preferences: normalizeProfile(readStorage<UserProfile | undefined>(LEGACY_PROFILE_STORAGE_KEY, undefined) ?? getDefaultProfile()),
+          created_at: user.createdAt,
+          updated_at: new Date().toISOString(),
+        });
+        await importLegacyDataRemote(user);
+        await loadRemoteData(user);
+        return { ok: true };
+      } finally {
+        setIsRemoteDataLoading(false);
+      }
     }
 
     if (accounts.some((account) => account.email.toLowerCase() === normalizedEmail)) return { ok: false, error: "An account with that email already exists." };
@@ -484,9 +535,14 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       if (error) return { ok: false, error: error.message };
       if (!data.user) return { ok: false, error: "We could not match that email and password." };
       const user = mapSupabaseUser(data.user);
+      setIsRemoteDataLoading(true);
       setSupabaseUser(user);
-      await loadRemoteData(user);
-      return { ok: true };
+      try {
+        await loadRemoteData(user);
+        return { ok: true };
+      } finally {
+        setIsRemoteDataLoading(false);
+      }
     }
 
     const account = accounts.find((item) => item.email.toLowerCase() === normalizedEmail);
@@ -498,9 +554,14 @@ export function AppStateProvider({ children }: PropsWithChildren) {
 
   const signOut = async () => {
     if (backendMode === "supabase" && supabase) {
-      await supabase.auth.signOut();
+      const pendingRemoteScanSaves = Array.from(pendingRemoteScanSavesRef.current);
+      const pendingRemoteProfileSaves = Array.from(pendingRemoteProfileSavesRef.current);
+      setIsRemoteDataLoading(false);
       setSupabaseUser(undefined);
-      // Clear all locally cached data — it is safely backed up in Supabase
+      await Promise.allSettled([...pendingRemoteScanSaves, ...pendingRemoteProfileSaves]);
+      await supabase.auth.signOut().catch((error) => {
+        console.error("Supabase sign out failed, clearing the local session anyway.", error);
+      });
       setScans([]);
       setFolders([]);
       setReflections([]);
@@ -509,6 +570,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       [SCANS_STORAGE_KEY, FOLDERS_STORAGE_KEY, REFLECTIONS_STORAGE_KEY,
        PROFILES_STORAGE_KEY, FOLDER_ORDER_STORAGE_KEY, DRAFT_STORAGE_KEY,
        SESSION_STORAGE_KEY].forEach((key) => window.localStorage.removeItem(key));
+      // Then tell Supabase — fire and forget, local state is already cleared
+      setSupabaseUser(undefined);
     } else {
       // Local mode: only clear session and draft — wiping data would destroy it permanently
       setCurrentUserId(undefined);
@@ -522,56 +585,85 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   const saveProfile = async (nextProfile: UserProfile) => {
     if (!currentUser) return;
     const normalized = normalizeProfile(nextProfile);
+    const previousProfile = normalizeProfile(profilesByUser[currentUser.id] ?? getDefaultProfile());
     setProfilesByUser((current) => ({ ...current, [currentUser.id]: normalized }));
-    if (backendMode === "supabase" && supabase) {
-      void supabase
-        .from("user_profiles")
-        .upsert({
+    if (backendMode === "supabase" && remoteDb) {
+      const remoteSavePromise = Promise.resolve(
+        remoteDb.from("user_profiles").upsert({
           user_id: currentUser.id,
           email: currentUser.email,
           display_name: currentUser.displayName,
           preferences: normalized,
           created_at: currentUser.createdAt,
           updated_at: new Date().toISOString(),
-        })
-        .then(({ error }) => {
-          if (error) {
-            console.error("Remote profile save failed after the local profile was already stored.", error);
-          }
-        })
-        .catch((error) => {
-          console.error("Remote profile save failed after the local profile was already stored.", error);
-        });
+        }),
+      );
+      pendingRemoteProfileSavesRef.current.add(remoteSavePromise);
+      void remoteSavePromise.finally(() => {
+        pendingRemoteProfileSavesRef.current.delete(remoteSavePromise);
+      });
+
+      try {
+        const { error } = await remoteSavePromise;
+        if (error) {
+          setProfilesByUser((current) => ({ ...current, [currentUser.id]: previousProfile }));
+          throw new Error(error.message);
+        }
+      } catch (error) {
+        setProfilesByUser((current) => ({ ...current, [currentUser.id]: previousProfile }));
+        console.error("Remote profile save failed after the local profile was already stored.", error);
+        throw error instanceof Error ? error : new Error("We could not save your profile to your account.");
+      }
     }
   };
 
   const saveScan = async (record: Omit<ScanRecord, "userId" | "isFavorite"> & Partial<Pick<ScanRecord, "isFavorite">>): Promise<ActionResult> => {
     if (!currentUser) return { ok: false, error: "Sign in to save scans." };
-    const nextRecord: ScanRecord = { ...record, userId: currentUser.id, isFavorite: record.isFavorite ?? false };
+    const nextRecord: ScanRecord = applyScanFolderIds(
+      { ...record, userId: currentUser.id, isFavorite: record.isFavorite ?? false },
+      record.folderIds ?? (record.folderId ? [record.folderId] : []),
+    );
     setScans((current) => [nextRecord, ...current.filter((item) => item.id !== nextRecord.id)]);
     setSelectedScanId(nextRecord.id);
-    if (backendMode === "supabase" && supabase) {
-      const remoteSavePromise = (async () => await supabase.from("scan_records").upsert(toScanRow(nextRecord)))();
+    if (backendMode === "supabase" && remoteDb) {
+      try {
+        const remoteSavePromise = (async () => {
+          const { error } = await remoteDb
+            .from("scan_records")
+            .upsert(toScanRow(nextRecord))
+            .select("id");
+          if (error) {
+            console.error("[LabelWise] remote save failed:", nextRecord.id, error);
+          }
+          return { error };
+        })();
+        pendingRemoteScanSavesRef.current.add(remoteSavePromise);
+        void remoteSavePromise.finally(() => {
+          pendingRemoteScanSavesRef.current.delete(remoteSavePromise);
+        });
 
-      remoteSavePromise.catch((error) => {
+        const remoteSaveResult = await Promise.race([
+          remoteSavePromise.then(({ error }) => ({ timedOut: false as const, error })),
+          new Promise<{ timedOut: true }>((resolve) => {
+            window.setTimeout(() => resolve({ timedOut: true }), REMOTE_SCAN_SAVE_TIMEOUT_MS);
+          }),
+        ]);
+
+        if (remoteSaveResult.timedOut) {
+          console.warn("[LabelWise] remote save timed out for", nextRecord.id);
+          return { ok: true, info: "Saved locally. Cloud sync may take a little longer." };
+        }
+
+        if (remoteSaveResult.error) {
+          setScans((current) => current.filter((item) => item.id !== nextRecord.id));
+          setSelectedScanId((current) => (current === nextRecord.id ? undefined : current));
+          return { ok: false, error: remoteSaveResult.error.message };
+        }
+      } catch (error) {
         console.error("Remote scan save failed after the local scan was already stored.", error);
-      });
-
-      const remoteSaveResult = await Promise.race([
-        remoteSavePromise.then(({ error }) => ({ timedOut: false as const, error })),
-        new Promise<{ timedOut: true }>((resolve) => {
-          window.setTimeout(() => resolve({ timedOut: true }), REMOTE_SCAN_SAVE_TIMEOUT_MS);
-        }),
-      ]);
-
-      if (remoteSaveResult.timedOut) {
-        return { ok: true, info: "Saved locally. Cloud sync may take a little longer." };
-      }
-
-      if (remoteSaveResult.error) {
         setScans((current) => current.filter((item) => item.id !== nextRecord.id));
         setSelectedScanId((current) => (current === nextRecord.id ? undefined : current));
-        return { ok: false, error: remoteSaveResult.error.message };
+        return { ok: false, error: error instanceof Error ? error.message : "We could not save this scan to your account." };
       }
     }
     return { ok: true };
@@ -582,9 +674,9 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     setReflections((current) => current.filter((entry) => entry.scanId !== scanId));
     setSelectedScanId((current) => (current === scanId ? undefined : current));
 
-    if (backendMode === "supabase" && supabase) {
-      await supabase.from("reflection_entries").delete().eq("scan_id", scanId);
-      await supabase.from("scan_records").delete().eq("id", scanId);
+    if (backendMode === "supabase" && remoteDb) {
+      await remoteDb.from("reflection_entries").delete().eq("scan_id", scanId);
+      await remoteDb.from("scan_records").delete().eq("id", scanId);
     }
   };
 
@@ -609,8 +701,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       ...current,
       [currentUser.id]: [...(current[currentUser.id] ?? userFolders.map((entry) => entry.id)), folder.id],
     }));
-    if (backendMode === "supabase" && supabase) {
-      const { error } = await supabase.from("scan_folders").insert(toFolderRow(folder));
+    if (backendMode === "supabase" && remoteDb) {
+      const { error } = await remoteDb.from("scan_folders").insert(toFolderRow(folder));
       if (error) return { ok: false, error: error.message };
     }
     return { ok: true, folderId: folder.id };
@@ -621,8 +713,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     if (!trimmed) return;
     const updatedAt = new Date().toISOString();
     setFolders((current) => current.map((folder) => (folder.id === folderId ? { ...folder, name: trimmed, updatedAt } : folder)));
-    if (backendMode === "supabase" && supabase) {
-      await supabase.from("scan_folders").update({ name: trimmed, updated_at: updatedAt }).eq("id", folderId);
+    if (backendMode === "supabase" && remoteDb) {
+      await remoteDb.from("scan_folders").update({ name: trimmed, updated_at: updatedAt }).eq("id", folderId);
     }
   };
 
@@ -634,10 +726,18 @@ export function AppStateProvider({ children }: PropsWithChildren) {
         [currentUser.id]: (current[currentUser.id] ?? []).filter((id) => id !== folderId),
       }));
     }
-    setScans((current) => current.map((scan) => (scan.folderId === folderId ? { ...scan, folderId: undefined } : scan)));
-    if (backendMode === "supabase" && supabase) {
-      await supabase.from("scan_records").update({ folder_id: null }).eq("folder_id", folderId);
-      await supabase.from("scan_folders").delete().eq("id", folderId);
+    const affectedScans = history.filter((scan) => scanHasFolder(scan, folderId));
+    setScans((current) =>
+      current.map((scan) => (scanHasFolder(scan, folderId) ? applyScanFolderIds(scan, getScanFolderIds(scan).filter((id) => id !== folderId)) : scan)),
+    );
+    if (backendMode === "supabase" && remoteDb) {
+      await Promise.all(
+        affectedScans.map((scan) => {
+          const nextFolderIds = getScanFolderIds(scan).filter((id) => id !== folderId);
+          return remoteDb.from("scan_records").update({ folder_id: nextFolderIds[0] ?? null, folder_ids: nextFolderIds }).eq("id", scan.id);
+        }),
+      );
+      await remoteDb.from("scan_folders").delete().eq("id", folderId);
     }
   };
 
@@ -668,19 +768,20 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       }),
     );
 
-    if (backendMode === "supabase" && supabase) {
+    if (backendMode === "supabase" && remoteDb) {
       await Promise.all(
         updatedFolders.map((folder) =>
-          supabase.from("scan_folders").update({ sort_index: folder.sortIndex ?? null, updated_at: new Date().toISOString() }).eq("id", folder.id),
+          remoteDb.from("scan_folders").update({ sort_index: folder.sortIndex ?? null, updated_at: new Date().toISOString() }).eq("id", folder.id),
         ),
       );
     }
   };
 
-  const moveScanToFolder = async (scanId: string, folderId?: string) => {
-    setScans((current) => current.map((scan) => (scan.id === scanId ? { ...scan, folderId } : scan)));
-    if (backendMode === "supabase" && supabase) {
-      await supabase.from("scan_records").update({ folder_id: folderId ?? null }).eq("id", scanId);
+  const updateScanFolders = async (scanId: string, folderIds: string[]) => {
+    const normalizedFolderIds = Array.from(new Set(folderIds.map((folderId) => folderId.trim()).filter((folderId) => folderId.length > 0)));
+    setScans((current) => current.map((scan) => (scan.id === scanId ? applyScanFolderIds(scan, normalizedFolderIds) : scan)));
+    if (backendMode === "supabase" && remoteDb) {
+      await remoteDb.from("scan_records").update({ folder_id: normalizedFolderIds[0] ?? null, folder_ids: normalizedFolderIds }).eq("id", scanId);
     }
   };
 
@@ -689,8 +790,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     if (!scan) return;
     const nextFavorite = !scan.isFavorite;
     setScans((current) => current.map((item) => (item.id === scanId ? { ...item, isFavorite: nextFavorite } : item)));
-    if (backendMode === "supabase" && supabase) {
-      await supabase.from("scan_records").update({ is_favorite: nextFavorite }).eq("id", scanId);
+    if (backendMode === "supabase" && remoteDb) {
+      await remoteDb.from("scan_records").update({ is_favorite: nextFavorite }).eq("id", scanId);
     }
   };
 
@@ -708,8 +809,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
 
     setScans((current) => current.map((scan) => (scan.id === scanId ? nextScan : scan)));
 
-    if (backendMode === "supabase" && supabase) {
-      await supabase
+    if (backendMode === "supabase" && remoteDb) {
+      await remoteDb
         .from("scan_records")
         .update({
           analysis: {
@@ -735,8 +836,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
 
     setScans((current) => current.map((scan) => (scan.id === scanId ? nextScan : scan)));
 
-    if (backendMode === "supabase" && supabase) {
-      await supabase
+    if (backendMode === "supabase" && remoteDb) {
+      await remoteDb
         .from("scan_records")
         .update({
           analysis: {
@@ -764,12 +865,12 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       ),
     );
 
-    if (backendMode === "supabase" && supabase) {
+    if (backendMode === "supabase" && remoteDb) {
       const updatePayload: Record<string, string | null> = {};
       if (nextProductName && nextProductName.length > 0) updatePayload.product_name = nextProductName;
       if (typeof payload.brandName !== "undefined") updatePayload.brand_name = nextBrandName || null;
       if (Object.keys(updatePayload).length > 0) {
-        await supabase.from("scan_records").update(updatePayload).eq("id", scanId);
+        await remoteDb.from("scan_records").update(updatePayload).eq("id", scanId);
       }
     }
   };
@@ -777,8 +878,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   const updateScanNote = async (scanId: string, note?: string) => {
     const nextNote = note?.trim() || undefined;
     setScans((current) => current.map((scan) => (scan.id === scanId ? { ...scan, userNote: nextNote } : scan)));
-    if (backendMode === "supabase" && supabase) {
-      await supabase.from("scan_records").update({ user_note: nextNote ?? null }).eq("id", scanId);
+    if (backendMode === "supabase" && remoteDb) {
+      await remoteDb.from("scan_records").update({ user_note: nextNote ?? null }).eq("id", scanId);
     }
   };
 
@@ -790,8 +891,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       ? { ...existing, ...payload, updatedAt: timestamp }
       : { id: createId("reflection"), userId: currentUser.id, scanId, ...payload, createdAt: timestamp, updatedAt: timestamp };
     setReflections((current) => (existing ? current.map((entry) => (entry.id === existing.id ? nextEntry : entry)) : [nextEntry, ...current]));
-    if (backendMode === "supabase" && supabase) {
-      await supabase.from("reflection_entries").upsert(toReflectionRow(nextEntry));
+    if (backendMode === "supabase" && remoteDb) {
+      await remoteDb.from("reflection_entries").upsert(toReflectionRow(nextEntry));
     }
   };
 
@@ -799,6 +900,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     () => ({
       currentUser,
       isAuthenticated: Boolean(currentUser),
+      isAuthResolved,
+      isRemoteDataLoading,
       backendMode,
       profile,
       history,
@@ -819,7 +922,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       renameFolder,
       deleteFolder,
       reorderFolder,
-      moveScanToFolder,
+      updateScanFolders,
       toggleFavorite,
       updateScanExplanation,
       updateScanDietCrossChecks,
@@ -828,7 +931,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       saveReflection,
       getReflection: (scanId) => userReflections.find((entry) => entry.scanId === scanId),
     }),
-    [backendMode, currentUser, draft, history, profile, selectedScanId, userFolders, userReflections, folderOrderByUser],
+    [backendMode, currentUser, draft, history, isAuthResolved, isRemoteDataLoading, profile, selectedScanId, userFolders, userReflections],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

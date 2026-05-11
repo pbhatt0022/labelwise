@@ -48,9 +48,19 @@ create table if not exists public.scan_records (
   analysis jsonb not null,
   profile_snapshot jsonb not null,
   folder_id uuid references public.scan_folders(id) on delete set null,
+  folder_ids jsonb not null default '[]'::jsonb,
   is_favorite boolean not null default false,
   user_note text
 );
+
+-- Migration: add folder_ids to existing tables
+alter table public.scan_records
+add column if not exists folder_ids jsonb not null default '[]'::jsonb;
+
+-- Back-fill: any row that already has folder_id set should include it in folder_ids
+update public.scan_records
+set folder_ids = jsonb_build_array(folder_id::text)
+where folder_id is not null and folder_ids = '[]'::jsonb;
 
 create table if not exists public.reflection_entries (
   id uuid primary key default gen_random_uuid(),

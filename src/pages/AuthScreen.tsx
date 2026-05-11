@@ -5,11 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppState } from "@/context/AppStateContext";
 import { hasProfileSelections } from "@/lib/analysis";
-import { ArrowRight, KeyRound, Leaf, LogIn, UserPlus } from "lucide-react";
+import { ArrowRight, KeyRound, Leaf, LogIn, UserPlus, FlaskConical } from "lucide-react";
+
+const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL as string | undefined;
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD as string | undefined;
+const hasDemoAccount = Boolean(DEMO_EMAIL && DEMO_PASSWORD);
 
 const AuthScreen = () => {
   const navigate = useNavigate();
-  const { backendMode, isAuthenticated, profile, signIn, signUp } = useAppState();
+  const { isAuthenticated, isRemoteDataLoading, profile, signIn, signUp } = useAppState();
   const [mode, setMode] = useState<"signin" | "signup">("signup");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -18,10 +22,10 @@ const AuthScreen = () => {
   const [info, setInfo] = useState("");
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isRemoteDataLoading) {
       navigate(hasProfileSelections(profile) ? "/home" : "/profile-setup", { replace: true });
     }
-  }, [isAuthenticated, navigate, profile]);
+  }, [isAuthenticated, isRemoteDataLoading, navigate, profile]);
 
   const handleSubmit = async () => {
     const result =
@@ -47,7 +51,7 @@ const AuthScreen = () => {
             </div>
             <h1 className="text-[28px] font-bold text-primary-foreground">LabelWise</h1>
             <p className="mt-[8px] text-sm leading-relaxed text-primary-foreground/70">
-                A facts-first, psychology-informed food-label literacy coach that helps you read ingredients and nutrition context without turning the experience into calorie tracking.
+              A facts-first, psychology-informed food-label literacy coach that helps you read ingredients and nutrition context without turning the experience into calorie tracking.
             </p>
           </div>
 
@@ -85,7 +89,7 @@ const AuthScreen = () => {
             </div>
             <div>
               <label className="mb-[8px] block text-sm font-medium text-primary-foreground">Password</label>
-              <Input value={password} type="password" placeholder="Create a simple password" onChange={(event) => setPassword(event.target.value)} />
+              <Input value={password} type="password" placeholder={mode === "signup" ? "Create a simple password" : "Your password"} onChange={(event) => setPassword(event.target.value)} />
             </div>
           </div>
 
@@ -96,15 +100,37 @@ const AuthScreen = () => {
             {mode === "signup" ? "Create account" : "Log in"} <ArrowRight size={18} />
           </Button>
 
+          {hasDemoAccount && (
+            <div className="mt-[12px] space-y-[6px]">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("signin");
+                  setEmail(DEMO_EMAIL!);
+                  setPassword(DEMO_PASSWORD!);
+                  setError("");
+                  setInfo("");
+                }}
+                className="w-full inline-flex items-center justify-center gap-[8px] rounded-full border border-primary-foreground/20 px-[16px] py-[10px] text-sm font-medium text-primary-foreground/70 transition hover:bg-primary-foreground/10"
+              >
+                <FlaskConical size={15} />
+                Try with demo account
+              </button>
+              <p className="hidden text-center text-[11px] text-primary-foreground/40">
+                Pre-loaded with example scans - no sign up needed
+              </p>
+              <p className="text-center text-[11px] text-primary-foreground/40">
+                Quick sign-in for testing. Sample scan examples are available after login.
+              </p>
+            </div>
+          )}
+
           <div className="mt-[18px] rounded-2xl bg-primary-foreground/10 p-[14px] text-sm text-primary-foreground/80">
             <div className="mb-[6px] inline-flex items-center gap-[8px] font-semibold">
               <KeyRound size={16} /> Why create an account?
             </div>
             <p>
               Your preferences, saved scans, custom folders, favorites, and reflections stay linked to your personal LabelWise workspace.
-            </p>
-            <p className="mt-[8px] text-xs text-primary-foreground/70">
-              Backend mode: {backendMode === "supabase" ? "Supabase hosted auth + database" : "Local fallback until Supabase keys are configured"}
             </p>
             <p className="mt-[8px] text-xs text-primary-foreground/70">
               Educational guidance only. LabelWise does not diagnose conditions, prescribe diets, or give medical advice.

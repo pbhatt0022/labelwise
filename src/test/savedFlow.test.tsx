@@ -42,6 +42,15 @@ const folder: ScanFolder = {
   sortIndex: 0,
 };
 
+const secondFolder: ScanFolder = {
+  id: "folder-2",
+  userId,
+  name: "Breakfast Ideas",
+  createdAt: "2026-05-04T00:00:00.000Z",
+  updatedAt: "2026-05-04T00:00:00.000Z",
+  sortIndex: 1,
+};
+
 function createStoredScan(): ScanRecord {
   return {
     id: "scan-1",
@@ -91,7 +100,7 @@ function seedLocalSession(scan: ScanRecord) {
   );
   localStorage.setItem(profileStorageKey, JSON.stringify({ [userId]: baseProfile }));
   localStorage.setItem(scanStorageKey, JSON.stringify([scan]));
-  localStorage.setItem(folderStorageKey, JSON.stringify([folder]));
+  localStorage.setItem(folderStorageKey, JSON.stringify([folder, secondFolder]));
   localStorage.setItem(reflectionStorageKey, JSON.stringify([]));
   localStorage.setItem(sessionStorageKey, JSON.stringify(userId));
 }
@@ -122,15 +131,17 @@ describe("saved scan flows", () => {
     expect(screen.getByText("Protein Crunch Cereal")).toBeInTheDocument();
   });
 
-  it("lets a saved scan move into a folder and reopen from history", async () => {
+  it("lets a saved scan live in multiple folders and reopen from history", async () => {
     seedLocalSession(createStoredScan());
     renderSavedFlow();
 
-    fireEvent.change(screen.getByLabelText("Folder"), { target: { value: folder.id } });
+    fireEvent.click(screen.getByLabelText(folder.name));
+    fireEvent.click(screen.getByLabelText(secondFolder.name));
     fireEvent.click(screen.getByRole("button", { name: /Saved/i }));
 
     expect(await screen.findByText("Your Library")).toBeInTheDocument();
     expect(screen.getAllByText("Review Later").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Breakfast Ideas").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getAllByRole("button", { name: /Protein Crunch Cereal/i })[0]);
 

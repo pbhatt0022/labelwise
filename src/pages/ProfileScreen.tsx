@@ -4,10 +4,11 @@ import { useNavigate } from "react-router-dom";
 import ProfileSummary from "@/components/ProfileSummary";
 import { Input } from "@/components/ui/input";
 import { useAppState } from "@/context/AppStateContext";
+import { scanHasFolder } from "@/lib/scanFolders";
 import { ChevronRight, EllipsisVertical, FolderHeart, LogOut, Mail, MoveDown, MoveUp, Shield, SlidersHorizontal } from "lucide-react";
 
 const ProfileScreen = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // used for profile-setup navigation
   const { currentUser, profile, folders, history, renameFolder, deleteFolder, reorderFolder, saveProfile, signOut } = useAppState();
   const [editingFolderId, setEditingFolderId] = useState<string | undefined>(undefined);
   const [menuFolderId, setMenuFolderId] = useState<string | undefined>(undefined);
@@ -207,7 +208,7 @@ const ProfileScreen = () => {
                       <div>
                         <p className="text-sm font-semibold text-foreground">{folder.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {history.filter((scan) => scan.folderId === folder.id).length} scans
+                          {history.filter((scan) => scanHasFolder(scan, folder.id)).length} scans
                         </p>
                       </div>
                       <div className="relative">
@@ -265,7 +266,7 @@ const ProfileScreen = () => {
         </div>
 
         <button
-          onClick={async () => { await signOut(); navigate("/auth"); }}
+          onClick={() => signOut()}
           className="flex min-h-[52px] w-full items-center gap-[14px] rounded-2xl bg-card px-[18px] py-[14px] shadow-card"
         >
           <LogOut size={18} className="text-muted-foreground shrink-0" />

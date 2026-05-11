@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import ScanFolderPicker from "@/components/ScanFolderPicker";
 import { Input } from "@/components/ui/input";
 import { useAppState } from "@/context/AppStateContext";
+import { getScanFolderIds, scanHasFolder } from "@/lib/scanFolders";
 import { Clock, FolderPlus, Star, Trash2 } from "lucide-react";
 
 const riskDot = {
@@ -19,7 +21,7 @@ const historyBadgeTone = {
 
 const HistoryScreenV2 = () => {
   const navigate = useNavigate();
-  const { history, folders, selectScan, createFolder, deleteScan, moveScanToFolder } = useAppState();
+  const { history, folders, selectScan, createFolder, deleteScan, updateScanFolders } = useAppState();
   const [filter, setFilter] = useState<string>("all");
   const [folderName, setFolderName] = useState("");
   const [folderError, setFolderError] = useState("");
@@ -27,7 +29,7 @@ const HistoryScreenV2 = () => {
   const filteredHistory = useMemo(() => {
     if (filter === "favorites") return history.filter((item) => item.isFavorite);
     if (filter === "all") return history;
-    return history.filter((item) => item.folderId === filter);
+    return history.filter((item) => scanHasFolder(item, filter));
   }, [filter, history]);
 
   const handleCreateFolder = async () => {
@@ -102,7 +104,10 @@ const HistoryScreenV2 = () => {
 
         {filteredHistory.length > 0 ? (
           filteredHistory.map((item, index) => {
-            const folder = folders.find((entry) => entry.id === item.folderId);
+            const itemFolderIds = getScanFolderIds(item);
+            const itemFolderNames = itemFolderIds
+              .map((id) => folders.find((f) => f.id === id)?.name)
+              .filter(Boolean) as string[];
             const flagCount = item.analysis.flags.length;
             const flagLabel = flagCount === 0 ? "No profile matches" : `${flagCount} profile ${flagCount === 1 ? "match" : "matches"}`;
             const badgeTone = historyBadgeTone[item.analysis.overallRisk];
@@ -129,7 +134,7 @@ const HistoryScreenV2 = () => {
                       <p className="text-xs text-muted-foreground">
                         {item.brandName ? `${item.brandName} · ` : ""}
                         {new Date(item.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                        {folder ? ` · ${folder.name}` : ""}
+                        {itemFolderNames.length > 0 ? ` · ${itemFolderNames.join(", ")}` : ""}
                       </p>
                     </div>
                     <span className={`h-[9px] w-[9px] shrink-0 rounded-full ${riskDot[item.analysis.overallRisk]}`} />
@@ -143,19 +148,19 @@ const HistoryScreenV2 = () => {
                     <Trash2 size={15} />
                   </button>
                 </div>
-                <div className="mt-[12px] flex items-center gap-[10px] border-t border-border pt-[12px]">
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground shrink-0">Folder</span>
-                  <select
-                    value={item.folderId ?? "none"}
-                    onChange={(e) => moveScanToFolder(item.id, e.target.value === "none" ? undefined : e.target.value)}
-                    className="h-[34px] flex-1 rounded-full border border-border bg-background px-[12px] text-sm text-foreground"
-                  >
-                    <option value="none">No folder</option>
-                    {folders.map((entry) => (
-                      <option key={entry.id} value={entry.id}>{entry.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {folders.length > 0 && (
+                  <div className="mt-[12px] flex items-center gap-[10px] border-t border-border pt-[12px]">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground shrink-0">Folder</span>
+                    <div className="flex-1">
+                      <ScanFolderPicker
+                        folders={folders}
+                        selectedFolderIds={itemFolderIds}
+                        onChange={(nextIds) => updateScanFolders(item.id, nextIds)}
+                        inputName={`history-folder-${item.id}`}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/sonner";
 import { Textarea } from "@/components/ui/textarea";
 import ShimmerLoader from "@/components/ShimmerLoader";
 import { useAppState } from "@/context/AppStateContext";
@@ -622,7 +623,7 @@ const ScanScreen = () => {
         ocrStatusAtSave: draft.ocrStatus,
         analysis,
         profileSnapshot: profile,
-        folderId: undefined,
+        folderIds: [],
         userNote: undefined,
       };
 
@@ -632,6 +633,12 @@ const ScanScreen = () => {
         setScanning(false);
         setSaveError(result.error ?? "We could not save this scan to your account.");
         return;
+      }
+
+      if (result.info) {
+        toast("Saved scan", {
+          description: result.info,
+        });
       }
 
       resetDraft();

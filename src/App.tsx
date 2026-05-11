@@ -28,7 +28,8 @@ const PersistentNav = () => {
 const queryClient = new QueryClient();
 
 const RequireAuth = ({ children }: { children: ReactElement }) => {
-  const { isAuthenticated } = useAppState();
+  const { isAuthenticated, isAuthResolved } = useAppState();
+  if (!isAuthResolved) return null;
   return isAuthenticated ? children : <Navigate to="/auth" replace />;
 };
 

@@ -7,9 +7,11 @@ import RiskSummaryBadge from "@/components/RiskSummaryBadge";
 import AiSummary from "@/components/AiSummary";
 import BottomNav from "@/components/BottomNav";
 import ProfileSummary from "@/components/ProfileSummary";
+import ScanFolderPicker from "@/components/ScanFolderPicker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppState } from "@/context/AppStateContext";
+import { getScanFolderIds } from "@/lib/scanFolders";
 import { formatNutrientValue, getProfileNutritionPreferences, hasMeaningfulNutritionFacts } from "@/lib/nutrition";
 import { ArrowLeft, BookmarkPlus, BrainCircuit, ChevronDown, ChevronUp, Star, Trash2 } from "lucide-react";
 
@@ -31,7 +33,7 @@ const DAILY_INTAKE_FIELDS: Array<{ key: NutritionRowKey; label: string; unit: st
 
 const ResultsScreen = () => {
   const navigate = useNavigate();
-  const { history, folders, selectedScanId, toggleFavorite, moveScanToFolder, updateScanDetails, updateScanNote, deleteScan } =
+  const { history, folders, selectedScanId, toggleFavorite, updateScanFolders, updateScanDetails, updateScanNote, deleteScan } =
     useAppState();
   const selectedScan = useMemo(
     () => history.find((item) => item.id === selectedScanId) ?? history[0],
@@ -69,7 +71,7 @@ const ResultsScreen = () => {
       flag.category === "Sweetener" ||
       flag.category === "Fat",
   );
-  const currentFolderId = selectedScan.folderId ?? "none";
+  const currentFolderIds = getScanFolderIds(selectedScan);
   const titleLooksUntitled = selectedScan.productName.trim().toLowerCase() === "untitled product";
 
   const macroChartData = useMemo(() => {
@@ -398,21 +400,19 @@ const ResultsScreen = () => {
             </label>
           </div>
 
-          <label className="mt-[10px] block text-sm text-muted-foreground">
-            Folder
-            <select
-              value={currentFolderId}
-              onChange={(event) => moveScanToFolder(selectedScan.id, event.target.value === "none" ? undefined : event.target.value)}
-              className="mt-[6px] h-[44px] w-full rounded-xl border border-border bg-background px-[12px] text-sm text-foreground"
-            >
-              <option value="none">No folder</option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {folders.length > 0 && (
+            <label className="mt-[10px] block text-sm text-muted-foreground">
+              Folders
+              <div className="mt-[6px]">
+                <ScanFolderPicker
+                  folders={folders}
+                  selectedFolderIds={currentFolderIds}
+                  onChange={(folderIds) => updateScanFolders(selectedScan.id, folderIds)}
+                  inputName={`results-folders-${selectedScan.id}`}
+                />
+              </div>
+            </label>
+          )}
 
           <div className="mt-[12px] flex gap-[8px]">
             <button

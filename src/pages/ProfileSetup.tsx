@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import ChipSelector from "@/components/ChipSelector";
@@ -30,6 +30,16 @@ const ProfileSetup = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [expandedSensitivityNotes, setExpandedSensitivityNotes] = useState<Partial<Record<SensitivityOption, boolean>>>({});
+
+  useEffect(() => {
+    setAllergies(profile.allergies);
+    setDiet(profile.diet);
+    setSensitivities(profile.sensitivities);
+    setCustomAvoids(profile.customAvoids);
+    setDailySugarPreference(profile.dailySugarPreferenceG?.toString() ?? "");
+    setDailySodiumPreference(profile.dailySodiumPreferenceMg?.toString() ?? "");
+    setDailySaturatedFatPreference(profile.dailySaturatedFatPreferenceG?.toString() ?? "");
+  }, [profile]);
 
   const toggle = <T extends string>(list: T[], setList: (value: T[]) => void, item: T) => {
     setList(list.includes(item) ? list.filter((entry) => entry !== item) : [...list, item]);
